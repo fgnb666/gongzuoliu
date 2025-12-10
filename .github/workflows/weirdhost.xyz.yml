@@ -1,4 +1,4 @@
-name: EternalZero
+name: weirdhost.xyz
 
 on:
   # 定时运行：每4小时执行一次
@@ -21,7 +21,7 @@ jobs:
     - name: Checkout private script repository
       uses: actions/checkout@v4
       with:
-        repository: fgnb999/gpanel.eternalzero.cloud  # 格式: username/repo-name
+        repository: fgnb666/hub.weirdhost.xy-hanguozhuzaiIP-baohuo  # 格式: username/repo-name
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}  # 需要有读取私库权限的 PAT
         path: scripts
       
