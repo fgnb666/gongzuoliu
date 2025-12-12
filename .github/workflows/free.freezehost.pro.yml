@@ -18,7 +18,7 @@ jobs:
     - name: Checkout private script repository
       uses: actions/checkout@v4
       with:
-        repository: kamanmuez/FreezeHost-Auto-Renew  # 私库地址
+        repository: fgnb666/free.freezehost.pro  # 私库地址
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         path: scripts
     
