@@ -1,0 +1,63 @@
+name: free.freezehost.pro
+
+on:
+  schedule:
+    # 每天运行一次，UTC 时间 04:00（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    
+    permissions:
+      actions: write
+    
+    steps:
+    - name: Checkout private script repository
+      uses: actions/checkout@v4
+      with:
+        repository: kamanmuez/FreezeHost-Auto-Renew  # 私库地址
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        path: scripts
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      working-directory: scripts
+      run: pip install -r requirements.txt
+    
+    - name: Install Playwright browsers
+      run: playwright install chromium
+    
+    - name: Install Playwright system dependencies
+      run: playwright install-deps chromium || true
+    
+    - name: Run renew script
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TZ: Asia/Shanghai
+      working-directory: scripts
+      run: python main.py
+    
+    - name: Upload debug screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-screenshots-${{ github.run_number }}
+        path: scripts/debug_*.png
+        if-no-files-found: ignore
+        
+    - name: Clean old workflow runs
+      if: always()
+      uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        repository: ${{ github.repository }}
+        older-than-seconds: 3600  # 删除1小时前的记录
