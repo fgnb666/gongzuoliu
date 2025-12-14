@@ -1,4 +1,4 @@
-name: Zampto Auto Renew
+name: dash.zampto.net
 
 on:
   schedule:
