@@ -1,0 +1,88 @@
+name: SkyBots Auto Renew
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 每天中午12点运行
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  check-servers:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout Private Repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/dash.skybots.tech-zidongxuqi  # 私库位置，格式: username/repo-name
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      - name: Setup WARP
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual
+          mode: wireguard
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements.txt'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+      
+      - name: Install Playwright Browser
+        run: |
+          playwright install chromium
+          playwright install-deps
+      
+      - name: Run SkyBots Script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        working-directory: scripts
+        run: python main.py
+      
+      - name: Upload Error Screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshots
+          path: |
+            scripts/debug_*.png
+            scripts/skybots_*.png
+          if-no-files-found: ignore
+      
+      - name: Upload bot.json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-data
+          path: scripts/bot.json
+          if-no-files-found: ignore
+      
+      - name: Failure Notification
+        if: failure()
+        run: |
+          echo "SkyBots script failed"
+          echo "Time: $(date)"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+      
+      - name: Cleanup Old Workflow Runs
+        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          repository: ${{ github.repository }}
+          older-than-seconds: 86400  #删除24小时前的工作流记录
