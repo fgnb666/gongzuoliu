@@ -1,4 +1,4 @@
-name: SkyBots Auto Renew
+name: dash.skybots.tech
 
 on:
   schedule:
