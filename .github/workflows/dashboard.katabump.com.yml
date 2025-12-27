@@ -14,7 +14,7 @@ jobs:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: https://github.com/fgnb666/dashboard.katabump.com-zidongxuqi
+          repository: fgnb666/dashboard.katabump.com-zidongxuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
