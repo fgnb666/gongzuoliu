@@ -1,0 +1,62 @@
+name: panel.njghosting.xyz
+
+on:
+  schedule:
+    # 每7天运行一次，北京时间中午12:00（UTC+8 → UTC 04:00），每周日
+    - cron: '0 4 * * 0'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # job 整体超时
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/panel.njghosting.xyz-zidongxuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 启用 Cloudflare WARP，让后续网络请求走 WARP 出口（防封、防慢）
+      - name: Set up WARP
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual     # IPv4 + IPv6 双栈
+          mode: wireguard # 轻量 WireGuard 模式
+
+      # 安装 Python 依赖（强烈推荐加，否则 main.py 很可能报 ModuleNotFound）
+      - name: Install dependencies
+        working-directory: scripts
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            # 如果没有 requirements.txt，默认安装常见包（根据你的脚本调整）
+            pip install requests httpx python-telegram-bot --upgrade
+          fi
+
+      - name: Run renew script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        working-directory: scripts
+        run: python main.py
+
+      - name: Upload JSON artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-responses
+          path: scripts/*.json
+          retention-days: 14  # 延长到14天，更方便排查
+          if-no-files-found: ignore
