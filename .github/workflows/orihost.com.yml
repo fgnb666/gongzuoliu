@@ -15,7 +15,7 @@ jobs:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/panel.njghosting.xyz-panel.orihost.com-zidongxuqi  # 私库位置，格式: username/repo-name
+          repository: fgnb666/panel.orihost.com-zidongxuqi  # 私库位置，格式: username/repo-name
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
