@@ -3,7 +3,7 @@ name: xserver.ne.jp
 on:
   schedule:
     # 每天北京时间21:00运行
-    - cron: '0 13 * * *'
+    - cron: '0 2 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
