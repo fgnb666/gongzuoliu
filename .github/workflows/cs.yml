@@ -1,42 +1,45 @@
-name: cs lum
+name: LumixCore Auto Renew
 
 on:
   schedule:
-    - cron: '0 4 * * 0'  # 每周日 UTC 4:00 (北京时间 12:00)
-  workflow_dispatch:  # 手动触发
+    - cron: '0 12 * * *'   # 每天 UTC 12:00 (北京时间 20:00)
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout private repo
+      - name: Checkout private repo (scripts)
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/cs
+          repository: fgnb666/cs         # 你的私库，里面放 renew_with_cookie.py
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      - name: Install Playwright browsers
+        run: |
+          pip install playwright
+          playwright install chromium
+
       - name: Run renew script
         env:
+          LUMIX_COOKIE: ${{ secrets.LUMIX_COOKIE }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          JEXACTYL_USERNAME: ${{ secrets.JEXACTYL_EMAIL }}
-          JEXACTYL_PASSWORD: ${{ secrets.JEXACTYL_PASSWORD }}
         working-directory: scripts
-        run: python main.py
-      
-      - name: Upload JSON artifacts
+        run: python renew_with_cookie.py
+
+      - name: Upload results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: api-responses
+          name: renew-results
           path: scripts/*.json
           retention-days: 7
-          if-no-files-found: ignore
