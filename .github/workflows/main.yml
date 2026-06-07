@@ -1,0 +1,47 @@
+name: Zytrano Auto Renew
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout private script repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/cp.zytrano.top-xuqijiaoben
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          path: private-script
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: private-script
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run renew script
+        working-directory: private-script
+        env:
+          ZYTRANO_USERNAME: ${{ secrets.ZYTRANO_USERNAME }}
+          ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
+          ZYTRANO_BASE_URL: ${{ vars.ZYTRANO_BASE_URL }}
+          ZYTRANO_RENEW_TEXT_RE: ${{ vars.ZYTRANO_RENEW_TEXT_RE }}
+          ZYTRANO_CONFIRM_TEXT_RE: ${{ vars.ZYTRANO_CONFIRM_TEXT_RE }}
+          ZYTRANO_SERVER_FILTER: ${{ vars.ZYTRANO_SERVER_FILTER }}
+          DRY_RUN: ${{ vars.DRY_RUN }}
+        run: python main.py
