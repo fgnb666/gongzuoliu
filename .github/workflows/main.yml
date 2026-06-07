@@ -1,0 +1,62 @@
+name: Zytrano Auto Renew
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每天 03:17 运行一次
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # 拉取私有脚本仓库
+      - name: Checkout private script repo via SSH
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/cp.zytrano.top-xuqijiaoben
+          path: private-script
+          ssh-key: ${{ secrets.PRIVATE_REPO_SSH_KEY }}
+          persist-credentials: false
+
+      # 设置 Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 安装依赖
+      - name: Install dependencies
+        working-directory: private-script
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      # 运行续期脚本
+      - name: Run renew script
+        working-directory: private-script
+        env:
+          ZYTRANO_USERNAME: ${{ secrets.ZYTRANO_USERNAME }}
+          ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
+          ZYTRANO_BASE_URL: ${{ vars.ZYTRANO_BASE_URL }}
+          ZYTRANO_RENEW_TEXT_RE: ${{ vars.ZYTRANO_RENEW_TEXT_RE }}
+          ZYTRANO_CONFIRM_TEXT_RE: ${{ vars.ZYTRANO_CONFIRM_TEXT_RE }}
+          ZYTRANO_SERVER_FILTER: ${{ vars.ZYTRANO_SERVER_FILTER }}
+          DRY_RUN: ${{ vars.DRY_RUN }}
+        run: python main.py
+
+      # 上传调试截图
+      - name: Upload debug screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zytrano-debug
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
