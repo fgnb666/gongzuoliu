@@ -3,7 +3,6 @@ name: zytrano.top
 on:
   schedule:
     - cron: '0 */4 * * *'
-
   workflow_dispatch:
 
 permissions:
@@ -13,6 +12,10 @@ permissions:
 jobs:
   auto-renew:
     runs-on: ubuntu-22.04
+
+    env:
+      ZYTRANO_ACCOUNT: ${{ secrets.ZYTRANO_ACCOUNT }}
+      ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
 
     steps:
     - name: Checkout private repository
@@ -41,20 +44,18 @@ jobs:
         pip install -r scripts/requirements.txt
 
     - name: Install Playwright browsers
-      run: |
-        python -m playwright install --with-deps chromium
+      run: python -m playwright install --with-deps chromium
 
     - name: Run renew script
       working-directory: scripts
-      run: python main.py
+      run: python renew_fixed.py
 
     - name: Upload screenshots
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: zytrano-screenshots
-        path: |
-          scripts/*.png
+        path: scripts/*.png
         if-no-files-found: ignore
 
     - name: Clean up old workflow runs
