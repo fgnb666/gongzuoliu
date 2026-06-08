@@ -1,100 +1,64 @@
-name: zytrano.top
+name: Zytrano Auto Renew
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
-  workflow_dispatch:
-    inputs:
-      debug:
-        description: 'Run with visible browser under Xvfb'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
-
-permissions:
-  contents: write
-  actions: write
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
-  auto-renew:
-    runs-on: ubuntu-22.04
-
-    env:
-      ZYTRANO_ACCOUNT: ${{ secrets.ZYTRANO_ACCOUNT }}
-      ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
-      ARTIFACT_DIR: artifacts
-      # 定时任务默认 headless=true；手动 workflow_dispatch 选择 debug=true 时，会在下面步骤改成 headless=false。
-      HEADLESS: 'true'
-      SLOW_MO: '0'
+  renew:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout private repository
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
-      - name: Set debug browser mode
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug == 'true' }}
-        run: |
-          echo "HEADLESS=false" >> "$GITHUB_ENV"
-          echo "SLOW_MO=300" >> "$GITHUB_ENV"
-
-      - name: Set up WARP
-        uses: fscarmen/warp-on-actions@v1.4
-        with:
-          stack: dual
-          mode: wireguard
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: 'scripts/requirements.txt'
 
       - name: Install dependencies
+        working-directory: scripts
         run: |
-          python -m pip install --upgrade pip
-          pip install -r scripts/requirements.txt
+          python -m pip install --upgrade pip -q
+          pip install -r requirements.txt -q
 
-      - name: Install Playwright browsers
-        run: python -m playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install --with-deps chromium
 
-      - name: Prepare artifact directory
+      - name: Run renew script
         working-directory: scripts
-        run: mkdir -p artifacts
+        env:
+          HEADLESS: 'true'
 
-      - name: Run renew script headless
-        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.debug == 'true') }}
-        working-directory: scripts
+          # 续期页面，已经和 main.py 里一致；这里保留方便以后改
+          ZYTRANO_BASE_URL: 'https://cp.zytrano.top'
+          ZYTRANO_LOGIN_URL: 'https://cp.zytrano.top/login'
+          ZYTRANO_SERVERS_URL: 'https://cp.zytrano.top/servers'
+
+          # 账号密码写死在 main.py 里时，这两个 Secrets 可以不配置
+          # 配了 Secrets 会覆盖 main.py 里的账号密码
+          ZYTRANO_ACCOUNT: ${{ secrets.ZYTRANO_ACCOUNT }}
+          ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
+
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
 
-      - name: Run renew script debug with Xvfb
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug == 'true' }}
-        working-directory: scripts
-        run: xvfb-run -a python main.py
-
-      - name: Upload debug artifacts
-        if: always()
+      - name: Upload response JSON files
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: zytrano-debug-artifacts
+          name: zytrano-renew-response
           path: |
-            scripts/artifacts/*.png
-            scripts/artifacts/*.html
-            scripts/*.png
-            scripts/*.html
+            scripts/response_*.json
+            scripts/artifacts/**
+          retention-days: 7
           if-no-files-found: ignore
-
-      - name: Clean up old workflow runs
-        uses: MajorScruffy/delete-old-workflow-runs@v0.3.0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          repository: ${{ github.repository }}
-          older-than-seconds: 1800
