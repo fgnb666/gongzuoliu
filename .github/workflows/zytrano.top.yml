@@ -4,12 +4,12 @@ on:
   schedule:
     # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-  workflow_dispatch:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -17,63 +17,35 @@ jobs:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Check files
-        run: |
-          echo "当前目录："
-          pwd
-          echo "工作区文件："
-          ls -la
-          echo "私库 scripts 文件："
-          ls -la scripts
-
+      
       - name: Install dependencies
         working-directory: scripts
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install requests playwright
-
-          if [ -f requirements.txt ]; then
-            python -m pip install -r requirements.txt
-          fi
-
-          python -m pip show requests
-          python -m pip show playwright
-
-      - name: Install Playwright Chromium
-        run: |
-          python -m playwright install --with-deps chromium
-
+        run: pip install -r requirements.txt -q > /dev/null 2>&1
+      
       - name: Run renew script
         working-directory: scripts
         env:
           HEADLESS: 'true'
 
-          ZYTRANO_BASE_URL: 'https://cp.zytrano.top'
-          ZYTRANO_LOGIN_URL: 'https://cp.zytrano.top/login'
-          ZYTRANO_SERVERS_URL: 'https://cp.zytrano.top/servers'
+          # 整段 Cookie Header（浏览器 F12 → Request Headers）
+          ZYTRANO_COOKIES: ${{ secrets.ZYTRANO_COOKIES }}
 
-          # 如果账号密码已经写在 main.py 里，这两个 Secrets 可以不用配置
-          ZYTRANO_ACCOUNT: ${{ secrets.ZYTRANO_ACCOUNT }}
-          ZYTRANO_PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
+          # 服务器ID
+          ZYTRANO_SERVER_IDS: "cLAyfRCAa1B55jGt-hgxZ"
 
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python main.py
-
+        run: python main.py
+      
       - name: Upload response JSON files
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zytrano-renew-response
-          path: |
-            scripts/response_*.json
-            scripts/artifacts/**
+          name: response-json
+          path: scripts/response_*.json
           retention-days: 7
-          if-no-files-found: ignore
