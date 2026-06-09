@@ -1,0 +1,60 @@
+name: MODVC Auto Renew
+
+on:
+  schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/jiaoben-siku  # 替换成你的仓库名
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          # 安装 Google Chrome（Camoufox 需要）
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      
+      - name: Install Python dependencies
+        working-directory: scripts
+        run: |
+          pip install -r requirements.txt -q > /dev/null 2>&1
+          # 下载 camoufox 浏览器
+          python -m camoufox fetch > /dev/null 2>&1
+      
+      - name: Run renew script
+        working-directory: scripts
+        env:
+          HEADLESS: 'true'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # MODVC 认证信息（二选一）
+          REMEMBER_WEB_COOKIE: ${{ secrets.MODVC_COOKIE }}
+          # COOKIE_NAME: ${{ secrets.MODVC_COOKIE_NAME }}  # 如果 cookie 名称不是默认的，取消注释
+        run: python main.py
+      
+      - name: Upload response JSON files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: response-json
+          path: scripts/response_*.json
+          retention-days: 7
