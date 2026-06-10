@@ -14,7 +14,7 @@ jobs:
     - name: Checkout private repo
       uses: actions/checkout@v4
       with:
-        repository: fgnb666/jiaoben-siku
+        repository: fgnb666/monkey-zidongxuqi
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         path: scripts
       
@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       working-directory: scripts
       run: |
-        pip install camoufox
+        pip install -r requirements.txt
         python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'camoufox', 'fetch'])"
         
     - name: Run renew script
