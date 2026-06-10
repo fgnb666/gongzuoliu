@@ -2,54 +2,48 @@ name: Monkey-Network Auto Renew
 
 on:
   schedule:
-    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
-  renew:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  auto-renew:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     
     steps:
-      - name: Checkout private repo
-        uses: actions/checkout@v4
-        with:
-          repository: fgnb666/monkey-zidongxuqi
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: scripts
+    - name: Checkout private repo
+      uses: actions/checkout@v4
+      with:
+        repository: fgnb666/jiaoben-siku
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        path: scripts
       
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        working-directory: scripts
-        run: |
-          pip install camoufox
-          python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'camoufox', 'fetch'])"
-      
-      - name: Run renew script
-        working-directory: scripts
-        env:
-          # 必需配置
-          API_KEY: ${{ secrets.API_KEY }}
-          RENEW_METHOD: api
-          
-          # 可选配置
-          HEADLESS: 'true'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NOTIFICATION_TITLE: '🐒 Monkey-Network 续期通知'
-          RENEW_COOLDOWN_DAYS: '14'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
         
-        run: python main.py
-      
-      - name: Upload response logs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: response-logs
-          path: scripts/response_*.json
-          retention-days: 7
+    - name: Install dependencies
+      working-directory: scripts
+      run: |
+        pip install camoufox
+        python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'camoufox', 'fetch'])"
+        
+    - name: Run renew script
+      working-directory: scripts
+      env:
+        API_KEY: ${{ secrets.API_KEY }}
+        HEADLESS: 'true'
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TZ: Asia/Shanghai
+      run: python main.py
+        
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: monkey-results-${{ github.run_number }}
+        path: scripts/response_*.json
+        retention-days: 7
+        if-no-files-found: ignore
