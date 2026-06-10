@@ -3,12 +3,16 @@ name: Zytrano Auto Renew
 on:
   schedule:
     # 每天 UTC 4:00 运行，北京时间 12:00
-    - cron: '0 4 */3 * *'
-  workflow_dispatch:
+    # 改为每天运行，续期一般每天都能点
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   renew:
     runs-on: ubuntu-latest
+    
+    # 添加超时限制，防止无限运行
+    timeout-minutes: 10
 
     steps:
       - name: Checkout private repo
@@ -23,25 +27,66 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xvfb \
+            libxkbcommon-x11-0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxrandr2 \
+            libgbm1 \
+            libpango-1.0-0 \
+            libcairo2 \
+            libasound2 \
+            libatspi2.0-0 \
+            libgtk-3-0
+
       - name: Install dependencies
         working-directory: scripts
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
-          python -m playwright install chromium
+          # 安装Playwright浏览器
+          python -m playwright install chromium --with-deps
+          # 安装Camoufox
           python -m camoufox fetch
 
       - name: Run renew script
         working-directory: scripts
         env:
           HEADLESS: 'true'
+          # 添加显示支持（无头浏览器需要）
+          DISPLAY: ':99'
+          # 添加Python无缓冲输出
+          PYTHONUNBUFFERED: '1'
+          # Telegram配置
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main.py
+          # 通知标题
+          NOTIFICATION_TITLE: 'Zytrano续期通知'
+        run: |
+          # 启动虚拟显示（可选，提高兼容性）
+          Xvfb :99 -screen 0 1920x1080x24 &
+          python main.py
 
-      - name: Upload response JSON files
+      - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always()  # 即使失败也上传
         with:
-          name: response-json
-          path: scripts/*.json
+          name: debug-screenshots
+          path: |
+            scripts/*.png
+            scripts/*.json
           retention-days: 7
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs
+          path: |
+            /home/runner/.cache/ms-playwright/
+            scripts/*.log
+          retention-days: 3
