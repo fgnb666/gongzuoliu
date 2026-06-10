@@ -6,44 +6,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  auto-renew:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
-    - name: Checkout private repo
-      uses: actions/checkout@v4
-      with:
-        repository: fgnb666/monkey-zidongxuqi
-        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        path: scripts
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/monkey-zidongxuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
       
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      working-directory: scripts
-      run: |
-        pip install -r requirements.txt
-        python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'camoufox', 'fetch'])"
-        
-    - name: Run renew script
-      working-directory: scripts
-      env:
-        API_KEY: ${{ secrets.API_KEY }}
-        HEADLESS: 'true'
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        TZ: Asia/Shanghai
-      run: python main.py
-        
-    - name: Upload artifacts
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: monkey-results-${{ github.run_number }}
-        path: scripts/response_*.json
-        retention-days: 7
-        if-no-files-found: ignore
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: scripts
+        run: pip install -r requirements.txt
+      
+      - name: Run renew
+        working-directory: scripts
+        run: python main.py
