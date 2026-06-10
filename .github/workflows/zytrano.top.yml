@@ -2,15 +2,15 @@ name: Zytrano Auto Renew
 
 on:
   schedule:
-    # 每天 UTC 4:00 运行，北京时间 12:00
+    # 每天 UTC 4:00 (北京时间 12:00) 运行
     - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 15
+    
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -18,13 +18,13 @@ jobs:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install system dependencies (修复版)
+      
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -41,43 +41,28 @@ jobs:
             libnss3 \
             libxss1 \
             libxtst6 \
-            libdrm2 \
-            libnspr4 \
-            libatk-bridge2.0-0 \
-            libcups2 \
-            libdbus-1-3 \
             libasound2t64
-
-      - name: Install Python dependencies
+      
+      - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install --upgrade pip
-          pip install camoufox playwright requests
-
-      - name: Install Playwright browser
-        run: |
-          python -m playwright install chromium
-
-      - name: Run renew script
+          pip install -r requirements.txt
+          playwright install chromium
+      
+      - name: Run renew
         working-directory: scripts
         env:
           HEADLESS: 'true'
           DISPLAY: ':99'
-          PYTHONUNBUFFERED: '1'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
           sleep 3
           python main.py
-
-      - name: Upload debug files
+      
+      - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: debug-files
-          path: |
-            scripts/*.png
-            scripts/*.json
-            scripts/*.log
+          name: debug-screenshots
+          path: scripts/*.png
           retention-days: 7
