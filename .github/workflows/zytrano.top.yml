@@ -8,6 +8,8 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,17 +17,38 @@ jobs:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
-      - name: Install
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libgbm1 libasound2
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
+          rm -f /tmp/chrome.deb
+
+      - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install requests
-      
-      - name: Renew
+          pip install -r requirements.txt
+
+      - name: Run renew
         working-directory: scripts
         run: python main.py
+
+      - name: Upload debug
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug
+          path: |
+            scripts/*.png
+            scripts/output/
+          retention-days: 7
