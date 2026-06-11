@@ -2,16 +2,16 @@ name: Zytrano Auto Renew
 
 on:
   schedule:
-    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
-      - name: Checkout private repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
@@ -27,29 +27,29 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-      
+        
       - name: Install dependencies
         working-directory: scripts
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
+          playwright install chromium
           python -m camoufox fetch
       
-      - name: Run renew script
+      - name: Run renew
         working-directory: scripts
         env:
           HEADLESS: 'true'
           DISPLAY: ':99'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          sleep 3
+          sleep 5
           python main.py
       
-      - name: Upload debug files
+      - name: Upload debug
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: debug-files
+          name: debug
           path: scripts/*.png
           retention-days: 7
