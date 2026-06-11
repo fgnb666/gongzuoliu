@@ -1,14 +1,29 @@
-name: Zytrano Auto Renew
+name: Zytrano Auto Renew - 拉取私库
 
 on:
   schedule:
+    # 每天 UTC 19:10 运行（北京时间次日 03:10）
     - cron: '10 19 * * *'
   workflow_dispatch:
+    inputs:
+      headless:
+        description: '无头模式'
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 jobs:
   renew:
+    name: 拉取私库并执行续期
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
+      # ============================================================
+      # 1. 检出私库
+      # ============================================================
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
@@ -16,34 +31,114 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
-      - name: Install Chrome
+      # ============================================================
+      # 2. 调试：查看私库内容
+      # ============================================================
+      - name: List private repo contents
+        run: |
+          echo "=== 私库内容 ==="
+          ls -la scripts/
+          echo "=== Python 文件 ==="
+          ls -la scripts/*.py 2>/dev/null || echo "没有找到 .py 文件"
+          echo "=== requirements.txt ==="
+          cat scripts/requirements.txt 2>/dev/null || echo "没有找到 requirements.txt"
+
+      # ============================================================
+      # 3. 安装 Chrome 和系统依赖
+      # ============================================================
+      - name: Install Chrome & Xvfb
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
+          rm -f /tmp/chrome.deb
+          google-chrome --version
 
+      # ============================================================
+      # 4. 设置 Python
+      # ============================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
+      # ============================================================
+      # 5. 安装 Python 依赖
+      # ============================================================
       - name: Install dependencies
         working-directory: scripts
-        run: pip install seleniumbase
+        run: |
+          pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          else
+            pip install seleniumbase
+          fi
 
-      - name: Run renew
+      # ============================================================
+      # 6. 执行续期脚本
+      # ============================================================
+      - name: Run renew script
         working-directory: scripts
         env:
-          HEADLESS: 'true'
+          HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+          DISPLAY: ':99'
+          # 可选：Telegram 通知
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # 启动虚拟显示
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
-          python zytrano_renew.py
+          
+          # 执行脚本
+          if [ -f "zytrano_renew.py" ]; then
+            python zytrano_renew.py
+          elif [ -f "main.py" ]; then
+            python main.py
+          elif [ -f "bypass.py" ]; then
+            python bypass.py
+          else
+            echo "❌ 未找到 Python 脚本"
+            ls -la
+            exit 1
+          fi
 
+      # ============================================================
+      # 7. 上传结果（Cookie、截图等）
+      # ============================================================
       - name: Upload result
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: result
-          path: scripts/output/
+          name: zytrano-renew-result
+          path: |
+            scripts/output/
+            scripts/*.json
+            scripts/*.txt
+            scripts/*.png
+          retention-days: 7
+
+      # ============================================================
+      # 8. 输出结果摘要
+      # ============================================================
+      - name: Show result summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "执行完成 - 结果摘要"
+          echo "=========================================="
+          
+          # 查找 cf_clearance
+          if [ -d "scripts/output" ]; then
+            find scripts/output -name "*.json" -exec grep -l "cf_clearance" {} \; 2>/dev/null | while read f; do
+              echo "📁 找到 Cookie: $f"
+              grep -o '"cf_clearance": "[^"]*"' "$f" 2>/dev/null | head -1
+            done
+          fi
+          
+          echo ""
+          echo "📁 输出文件:"
+          find scripts -type f \( -name "*.json" -o -name "*.txt" \) 2>/dev/null | head -10
