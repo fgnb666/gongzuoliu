@@ -2,13 +2,14 @@ name: Zytrano Auto Renew
 
 on:
   schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-  workflow_dispatch:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 15  # 添加超时限制
     
     steps:
       - name: Checkout private repo
@@ -42,7 +43,7 @@ jobs:
             libxtst6 \
             libasound2t64
       
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: scripts
         run: |
           pip install --upgrade pip
@@ -50,11 +51,13 @@ jobs:
           python -m playwright install chromium
           python -m camoufox fetch
       
-      - name: Run renew
+      - name: Run renew script
         working-directory: scripts
         env:
           HEADLESS: 'true'
           DISPLAY: ':99'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
           sleep 3
@@ -65,5 +68,7 @@ jobs:
         if: always()
         with:
           name: debug-files
-          path: scripts/*.png
+          path: |
+            scripts/*.png
+            scripts/*.json
           retention-days: 7
