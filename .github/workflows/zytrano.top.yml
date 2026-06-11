@@ -4,7 +4,7 @@ on:
   schedule:
     # 每天 UTC 时间 19:10 运行（北京时间次日 03:10）
     - cron: '10 19 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -23,40 +23,29 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install Chrome and dependencies
+      - name: Install Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
-          rm -f /tmp/chrome.deb
-          google-chrome --version
       
       - name: Install dependencies
         working-directory: scripts
-        run: pip install -r requirements.txt -q > /dev/null 2>&1 || pip install seleniumbase -q
+        run: pip install seleniumbase -q
       
-      - name: Run renew script
+      - name: Run renew
         working-directory: scripts
         env:
           HEADLESS: 'true'
-          USERNAME: ${{ secrets.ZYTRANO_USERNAME }}
-          PASSWORD: ${{ secrets.ZYTRANO_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
-          python main.py
+          python zytrano_renew.py
       
-      - name: Upload response JSON files
+      - name: Upload result
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zytrano-renew-result
-          path: |
-            scripts/response_*.json
-            scripts/output/
-            scripts/*.json
-            scripts/*.txt
-          retention-days: 7
+          name: zytrano-result
+          path: scripts/output/
