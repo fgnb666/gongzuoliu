@@ -21,10 +21,22 @@ jobs:
         with:
           python-version: '3.11'
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libasound2t64
+      
       - name: Install
         working-directory: scripts
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
       
       - name: Renew
         working-directory: scripts
-        run: python main.py
+        env:
+          DISPLAY: ':99'
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          sleep 3
+          python main.py
