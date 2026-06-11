@@ -1,4 +1,4 @@
-name: Zytrano Auto Renew
+name: zytrano.top
 
 on:
   schedule:
