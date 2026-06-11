@@ -18,6 +18,14 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
+      # 新增：查看私库里到底有什么文件
+      - name: Debug - list files in private repo
+        run: |
+          echo "=== 私库文件列表 ==="
+          ls -la scripts/
+          echo "=== Python 文件 ==="
+          find scripts -name "*.py" -type f
+
       - name: Install Chrome
         run: |
           sudo apt-get update
@@ -45,7 +53,22 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
-          python zytrano_renew.py
+          
+          # 自动检测并运行私库中的 Python 脚本
+          if [ -f "zytrano_renew.py" ]; then
+            python zytrano_renew.py
+          elif [ -f "main.py" ]; then
+            python main.py
+          elif [ -f "bypass.py" ]; then
+            python bypass.py
+          elif [ -f "run.py" ]; then
+            python run.py
+          else
+            echo "❌ 私库中没有找到 Python 脚本文件！"
+            echo "当前目录内容："
+            ls -la
+            exit 1
+          fi
 
       - name: Upload result
         uses: actions/upload-artifact@v4
