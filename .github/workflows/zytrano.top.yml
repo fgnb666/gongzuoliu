@@ -8,8 +8,6 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,36 +21,19 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libx11-xcb1 libasound2t64
-      
-      - name: Install Camoufox stable
+      - name: Install
         working-directory: scripts
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m playwright install chromium
-          python -m camoufox sync
-          python -m camoufox set official/stable/135.0.1-beta.24
-          python -m camoufox fetch
-          python -m camoufox version
+          pip install playwright
+          playwright install chromium
       
-      - name: Run renew
+      - name: Renew
         working-directory: scripts
-        env:
-          HEADLESS: 'virtual'
-          DISPLAY: ':99'
-        run: |
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          sleep 5
-          python main.py
+        run: python main.py
       
-      - name: Upload debug
+      - name: Upload
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: debug
+          name: screenshots
           path: scripts/*.png
-          retention-days: 7
