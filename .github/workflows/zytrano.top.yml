@@ -1,17 +1,9 @@
-name: Zytrano Auto Renew - 拉取私库
+name: Zytrano Auto Renew
 
 on:
   schedule:
     - cron: '10 19 * * *'
   workflow_dispatch:
-    inputs:
-      headless:
-        description: '无头模式'
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 
 jobs:
   renew:
@@ -19,9 +11,6 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # ============================================================
-      # 1. 检出私库（使用 PAT）
-      # ============================================================
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
@@ -29,96 +18,38 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
-      # ============================================================
-      # 2. 调试：查看私库内容
-      # ============================================================
-      - name: Debug - list files
-        run: |
-          echo "=== 私库内容 ==="
-          ls -la scripts/
-          echo "=== Python 文件 ==="
-          ls -la scripts/*.py 2>/dev/null || echo "未找到 .py 文件"
-
-      # ============================================================
-      # 3. 安装 Chrome 和依赖
-      # ============================================================
-      - name: Install Chrome & Xvfb
+      - name: Install Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
-          rm -f /tmp/chrome.deb
           google-chrome --version
 
-      # ============================================================
-      # 4. 设置 Python
-      # ============================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ============================================================
-      # 5. 安装依赖
-      # ============================================================
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: scripts
         run: |
           pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          else
-            pip install seleniumbase
-          fi
+          pip install seleniumbase
 
-      # ============================================================
-      # 6. 执行续期脚本
-      # ============================================================
-      - name: Run renew script
+      - name: Run renew
         working-directory: scripts
         env:
-          USERNAME: ${{ secrets.ZYTRANO_USERNAME || 'phjkd' }}
-          PASSWORD: ${{ secrets.ZYTRANO_PASSWORD || 'yq2606428' }}
-          HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+          HEADLESS: 'true'
           DISPLAY: ':99'
         run: |
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
-          
-          if [ -f "zytrano_renew.py" ]; then
-            python zytrano_renew.py
-          elif [ -f "main.py" ]; then
-            python main.py
-          else
-            echo "❌ 未找到脚本文件"
-            ls -la
-            exit 1
-          fi
+          python zytrano_renew.py
 
-      # ============================================================
-      # 7. 上传结果
-      # ============================================================
       - name: Upload result
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zytrano-renew-result
+          name: result
           path: scripts/output/
-          retention-days: 7
-
-      # ============================================================
-      # 8. 显示结果摘要
-      # ============================================================
-      - name: Show result summary
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "执行完成"
-          echo "=========================================="
-          if [ -d "scripts/output" ]; then
-            find scripts/output -name "*.json" -exec grep -l "cf_clearance" {} \; | while read f; do
-              echo "📁 $f"
-              grep -o '"cf_clearance": "[^"]*"' "$f" | head -1
-            done
-          fi
