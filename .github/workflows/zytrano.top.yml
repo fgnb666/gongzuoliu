@@ -8,8 +8,6 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,31 +21,11 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libx11-xcb1 libasound2t64
-      
-      - name: Install dependencies
+      - name: Install
         working-directory: scripts
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests
       
-      - name: Run renew
+      - name: Renew
         working-directory: scripts
-        env:
-          HEADLESS: 'false'
-          DISPLAY: ':99'
-        run: |
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          sleep 5
-          python main.py
-      
-      - name: Upload debug
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: debug
-          path: scripts/*.png
-          retention-days: 7
+        run: python main.py
