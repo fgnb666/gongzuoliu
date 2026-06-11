@@ -8,35 +8,44 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      
-      - name: Install Playwright
+          python-version: "3.11"
+
+      - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install playwright
+          pip install -r requirements.txt
+
+      - name: Install Playwright Browser
+        working-directory: scripts
+        run: |
           playwright install chromium
-      
-      - name: Renew
+
+      - name: Run renew script
         working-directory: scripts
         env:
-          DISPLAY: ':99'
+          HEADLESS: "true"
         run: |
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          sleep 3
           python main.py
+
+      - name: Upload Debug Files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zytrano-debug
+          path: |
+            scripts/debug/**
+            scripts/*.png
+            scripts/*.html
+          retention-days: 7
