@@ -8,7 +8,7 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     
     steps:
       - name: Checkout
@@ -26,20 +26,23 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
-        
-      - name: Install dependencies
+          sudo apt-get install -y xvfb libgtk-3-0 libx11-xcb1 libasound2t64
+      
+      - name: Install Camoufox stable
         working-directory: scripts
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install chromium
+          python -m playwright install chromium
+          python -m camoufox sync
+          python -m camoufox set official/stable/135.0.1-beta.24
           python -m camoufox fetch
+          python -m camoufox version
       
       - name: Run renew
         working-directory: scripts
         env:
-          HEADLESS: 'true'
+          HEADLESS: 'virtual'
           DISPLAY: ':99'
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
