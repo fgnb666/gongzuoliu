@@ -42,11 +42,13 @@ jobs:
             libxtst6 \
             libasound2t64
       
-      - name: Install dependencies
+      - name: Install Python dependencies
         working-directory: scripts
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install chromium
+          python -m playwright install chromium
+          python -m camoufox fetch
       
       - name: Run renew
         working-directory: scripts
