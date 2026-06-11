@@ -1,4 +1,4 @@
-name: zytrano.top
+name: Zytrano Auto Renew
 
 on:
   schedule:
@@ -18,20 +18,13 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
-      # 新增：查看私库里到底有什么文件
-      - name: Debug - list files in private repo
-        run: |
-          echo "=== 私库文件列表 ==="
-          ls -la scripts/
-          echo "=== Python 文件 ==="
-          find scripts -name "*.py" -type f
-
       - name: Install Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
+          rm -f /tmp/chrome.deb
           google-chrome --version
 
       - name: Setup Python
@@ -43,32 +36,16 @@ jobs:
         working-directory: scripts
         run: |
           pip install --upgrade pip
-          pip install seleniumbase
+          pip install -r requirements.txt
 
       - name: Run renew
         working-directory: scripts
         env:
-          HEADLESS: 'true'
           DISPLAY: ':99'
         run: |
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
-          
-          # 自动检测并运行私库中的 Python 脚本
-          if [ -f "zytrano_renew.py" ]; then
-            python zytrano_renew.py
-          elif [ -f "main.py" ]; then
-            python main.py
-          elif [ -f "bypass.py" ]; then
-            python bypass.py
-          elif [ -f "run.py" ]; then
-            python run.py
-          else
-            echo "❌ 私库中没有找到 Python 脚本文件！"
-            echo "当前目录内容："
-            ls -la
-            exit 1
-          fi
+          python zytrano_renew.py
 
       - name: Upload result
         uses: actions/upload-artifact@v4
