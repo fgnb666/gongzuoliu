@@ -8,7 +8,6 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -16,27 +15,23 @@ jobs:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
+
       - name: Install Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
-      
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         working-directory: scripts
-        run: pip install seleniumbase -q
-      
-      - name: List files (debug)
-        working-directory: scripts
-        run: ls -la
-      
+        run: pip install seleniumbase
+
       - name: Run renew
         working-directory: scripts
         env:
@@ -45,10 +40,10 @@ jobs:
           Xvfb :99 -screen 0 1280x720x24 &
           export DISPLAY=:99
           python zytrano_renew.py
-      
+
       - name: Upload result
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zytrano-result
+          name: result
           path: scripts/output/
