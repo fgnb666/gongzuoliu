@@ -1,0 +1,67 @@
+# .github/workflows/zytrano.yml
+name: zytrano
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 8 * * *'  # 每天 UTC 8:00 自动运行
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 拉取私有仓库
+    - name: 拉取私有仓库
+      uses: actions/checkout@v4
+      with:
+        repository: fgnb666/cp.zytrano.top-xuqijiaoben
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+    # 安装 Python
+    - name: 安装 Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    # 安装依赖
+    - name: 安装依赖
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb libnss3 libgbm1 libasound2
+        
+        pip install camoufox playwright
+        python -m camoufox fetch
+        
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+
+    # 运行脚本
+    - name: 运行脚本
+      run: |
+        if [ -f main.py ]; then
+          xvfb-run python main.py
+        elif [ -f login.py ]; then
+          xvfb-run python login.py
+        elif [ -f run.py ]; then
+          xvfb-run python run.py
+        else
+          xvfb-run python *.py
+        fi
+      env:
+        USERNAME: ${{ secrets.USERNAME }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+
+    # 保存结果
+    - name: 上传结果
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: 运行结果
+        path: |
+          *.png
+          *.log
+          *.json
+          *.txt
+        retention-days: 7
