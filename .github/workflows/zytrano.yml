@@ -1,77 +1,41 @@
-# .github/workflows/zytrano.yml
 name: zytrano
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   schedule:
-    - cron: '0 8 * * *'  # 每天 UTC 8:00 自动运行
+    - cron: '0 8 * * *'
 
 jobs:
   run:
     runs-on: ubuntu-latest
     
     steps:
-    # 拉取私有仓库
     - name: 拉取私有仓库
       uses: actions/checkout@v4
       with:
         repository: fgnb666/cp.zytrano.top-xuqijiaoben
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
-    # 查看文件结构
-    - name: 查看文件
-      run: |
-        echo "=== 仓库文件 ==="
-        ls -la
-        echo ""
-        echo "=== Python 文件 ==="
-        find . -name "*.py" -type f
-        echo ""
-        echo "=== requirements.txt ==="
-        cat requirements.txt 2>/dev/null || echo "没有 requirements.txt"
-
-    # 安装 Python
     - name: 安装 Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 安装依赖
     - name: 安装依赖
       run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
         python -m pip install --upgrade pip
-        pip install camoufox playwright
+        pip install nodriver camoufox playwright
         python -m camoufox fetch
-        playwright install chromium
         if [ -f requirements.txt ]; then
           pip install -r requirements.txt
         fi
 
-    # 调试运行
-    - name: 调试运行
-      continue-on-error: true
+    - name: 运行脚本
       run: |
-        echo "=== 测试导入 ==="
-        python -c "from camoufox import Camoufox; print('camoufox OK')"
-        python -c "import asyncio; print('asyncio OK')"
-        echo ""
-        
-        echo "=== 运行脚本 ==="
-        if [ -f login.py ]; then
-          python -u login.py 2>&1 || echo "退出码: $?"
-        elif [ -f main.py ]; then
-          python -u main.py 2>&1 || echo "退出码: $?"
-        else
-          echo "没有找到 login.py 或 main.py"
-        fi
-      env:
-        LOGIN_URL: https://cp.zytrano.top/login
-        RENEW_URL: https://cp.zytrano.top/servers
-        USERNAME: phjkd
-        PASSWORD: yq2606428
-        API_KEY: pyro_MDnx88O1yvSpjEKhQatvHTsa9n5p63Ry1vGhpMy7tIT
+        python main.py
 
-    # 保存结果
     - name: 上传结果
       uses: actions/upload-artifact@v4
       if: always()
