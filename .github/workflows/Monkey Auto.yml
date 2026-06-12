@@ -1,5 +1,4 @@
-```yaml
-name: Monkey Auto Renew
+name: Monkey Auto
 
 on:
   schedule:
