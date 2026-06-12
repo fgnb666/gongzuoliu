@@ -18,6 +18,18 @@ jobs:
         repository: fgnb666/cp.zytrano.top-xuqijiaoben
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
+    # 查看文件结构
+    - name: 查看文件
+      run: |
+        echo "=== 仓库文件 ==="
+        ls -la
+        echo ""
+        echo "=== Python 文件 ==="
+        find . -name "*.py" -type f
+        echo ""
+        echo "=== requirements.txt ==="
+        cat requirements.txt 2>/dev/null || echo "没有 requirements.txt"
+
     # 安装 Python
     - name: 安装 Python
       uses: actions/setup-python@v5
@@ -27,27 +39,30 @@ jobs:
     # 安装依赖
     - name: 安装依赖
       run: |
-        sudo apt-get update
-        sudo apt-get install -y xvfb libnss3 libgbm1 libasound2
-        
+        python -m pip install --upgrade pip
         pip install camoufox playwright
         python -m camoufox fetch
-        
+        playwright install chromium
         if [ -f requirements.txt ]; then
           pip install -r requirements.txt
         fi
 
-    # 运行脚本
-    - name: 运行脚本
+    # 调试运行
+    - name: 调试运行
+      continue-on-error: true
       run: |
-        if [ -f main.py ]; then
-          xvfb-run python main.py
-        elif [ -f login.py ]; then
-          xvfb-run python login.py
-        elif [ -f run.py ]; then
-          xvfb-run python run.py
+        echo "=== 测试导入 ==="
+        python -c "from camoufox import Camoufox; print('camoufox OK')"
+        python -c "import asyncio; print('asyncio OK')"
+        echo ""
+        
+        echo "=== 运行脚本 ==="
+        if [ -f login.py ]; then
+          python -u login.py 2>&1 || echo "退出码: $?"
+        elif [ -f main.py ]; then
+          python -u main.py 2>&1 || echo "退出码: $?"
         else
-          xvfb-run python *.py
+          echo "没有找到 login.py 或 main.py"
         fi
       env:
         LOGIN_URL: https://cp.zytrano.top/login
@@ -65,6 +80,5 @@ jobs:
         path: |
           *.png
           *.log
-          *.json
           *.txt
         retention-days: 7
