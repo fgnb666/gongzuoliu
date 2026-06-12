@@ -1,0 +1,36 @@
+name: Monkey Renew
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 每6小时执行一次
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Private Repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/monkey-zidongxuqi
+          token: ${{ secrets.PAT }}   # 必须在仓库 Secrets 里建 PAT
+          path: monkey-zidongxuqi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          cd monkey-zidongxuqi
+          pip install -r requirements.txt
+
+      - name: Run Script
+        env:
+          MONKEY_USER: ${{ secrets.MONKEY_USER }}
+          MONKEY_PASS: ${{ secrets.MONKEY_PASS }}
+        run: |
+          cd monkey-zidongxuqi
+          python main.py
