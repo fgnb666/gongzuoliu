@@ -2,13 +2,15 @@ name: Monkey Auto
 
 on:
   schedule:
-    # 每周四 UTC 时间 4:00 运行（北京时间 12:00）
-    - cron: "0 4 * * 4"
+    # 每天北京时间12:00和20:00运行
+    - cron: "0 4 * * *"
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 jobs:
-  renew:
+  clicker:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout private repo
@@ -28,19 +30,26 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Run renew script
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Run clicker script
         working-directory: scripts
         env:
-          HEADLESS: "true"
+          monkey_email: ${{ secrets.MONKEY_EMAIL }}
+          monkey_password: ${{ secrets.MONKEY_PASSWORD }}
+          MONKEY_API_KEY: ${{ secrets.MONKEY_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python main.py
+          python monkey.py
 
-      - name: Upload response JSON files
-        uses: actions/upload-artifact@v4
+      - name: Upload screenshots
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: response-json
-          path: scripts/response_*.json
+          name: screenshots
+          path: scripts/*.png
           retention-days: 7
