@@ -50,6 +50,8 @@ jobs:
           xvfb-run python *.py
         fi
       env:
+        LOGIN_URL: https://cp.zytrano.top/login
+        RENEW_URL: https://cp.zytrano.top/servers
         USERNAME: ${{ secrets.USERNAME }}
         PASSWORD: ${{ secrets.PASSWORD }}
 
