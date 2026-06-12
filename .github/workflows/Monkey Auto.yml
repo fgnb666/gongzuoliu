@@ -1,8 +1,7 @@
-name: Monkey Auto
+name: Monkey Clicker Auto
 
 on:
   schedule:
-    # 每天北京时间12:00和20:00运行
     - cron: "0 4 * * *"
     - cron: "0 12 * * *"
   workflow_dispatch:
@@ -38,9 +37,6 @@ jobs:
       - name: Run clicker script
         working-directory: scripts
         env:
-          monkey_email: ${{ secrets.MONKEY_EMAIL }}
-          monkey_password: ${{ secrets.MONKEY_PASSWORD }}
-          MONKEY_API_KEY: ${{ secrets.MONKEY_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
