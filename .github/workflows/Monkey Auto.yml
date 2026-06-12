@@ -2,8 +2,8 @@ name: Monkey Auto
 
 on:
   schedule:
-    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
-    - cron: "0 4 * * *"
+    # 每周四 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: "0 4 * * 4"
   workflow_dispatch:
 
 jobs:
@@ -26,13 +26,11 @@ jobs:
       - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install -r requirements.txt -q
+          pip install -r requirements.txt
 
       - name: Run renew script
         working-directory: scripts
         env:
-          MONKEY_EMAIL: ${{ secrets.MONKEY_EMAIL }}
-          MONKEY_PASSWORD: ${{ secrets.MONKEY_PASSWORD }}
           HEADLESS: "true"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -46,4 +44,3 @@ jobs:
           name: response-json
           path: scripts/response_*.json
           retention-days: 7
-```
