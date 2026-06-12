@@ -1,8 +1,10 @@
-name: Monkey Renew
+```yaml
+name: Monkey Auto Renew
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # 每6小时执行一次
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,27 +12,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Private Repo
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/monkey-zidongxuqi
-          token: ${{ secrets.PAT }}   # 必须在仓库 Secrets 里建 PAT
-          path: monkey-zidongxuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies
+      - name: Install dependencies
+        working-directory: scripts
         run: |
-          cd monkey-zidongxuqi
-          pip install -r requirements.txt
+          pip install -r requirements.txt -q
 
-      - name: Run Script
+      - name: Run renew script
+        working-directory: scripts
         env:
-          MONKEY_USER: ${{ secrets.MONKEY_USER }}
-          MONKEY_PASS: ${{ secrets.MONKEY_PASS }}
+          MONKEY_EMAIL: ${{ secrets.MONKEY_EMAIL }}
+          MONKEY_PASSWORD: ${{ secrets.MONKEY_PASSWORD }}
+          HEADLESS: "true"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          cd monkey-zidongxuqi
           python main.py
+
+      - name: Upload response JSON files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: response-json
+          path: scripts/response_*.json
+          retention-days: 7
+```
