@@ -52,8 +52,9 @@ jobs:
       env:
         LOGIN_URL: https://cp.zytrano.top/login
         RENEW_URL: https://cp.zytrano.top/servers
-        USERNAME: ${{ secrets.USERNAME }}
-        PASSWORD: ${{ secrets.PASSWORD }}
+        USERNAME: phjkd
+        PASSWORD: yq2606428
+        API_KEY: pyro_MDnx88O1yvSpjEKhQatvHTsa9n5p63Ry1vGhpMy7tIT
 
     # 保存结果
     - name: 上传结果
