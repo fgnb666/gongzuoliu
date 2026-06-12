@@ -2,13 +2,13 @@ name: Monkey-Network Auto Renew
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 4 * * 4'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     
     steps:
       - name: Checkout private repo
@@ -25,9 +25,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: scripts
-        run: |
-          pip install -r requirements.txt
-          playwright install chromium
+        run: pip install -r requirements.txt
       
       - name: Run renew
         working-directory: scripts
