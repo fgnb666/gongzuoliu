@@ -1,4 +1,4 @@
-name: Zytrano
+name: Zytrano Auto Renew
 
 on:
   schedule:
@@ -34,22 +34,19 @@ jobs:
         working-directory: scripts
         run: |
           pip install seleniumbase pyvirtualdisplay requests
-          # 如果有 requirements.txt 就安装
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt || echo "requirements.txt 不存在或已安装"
       
       - name: Run renew script
         working-directory: scripts
         env:
-          DISPLAY: ':99'
-          HEADLESS: 'true'
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # 账号密码直接从脚本内置了，不需要环境变量
         run: |
           # 启动虚拟显示
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
-          # 运行脚本（脚本里的账号密码已经写死了 phjkd / yq2606428）
+          export DISPLAY=:99
+          # 运行脚本
           python monkey.py
       
       - name: Upload debug screenshots
