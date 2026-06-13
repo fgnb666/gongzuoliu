@@ -1,4 +1,4 @@
-name: zytrano
+name: CP Zytrano Auto Bot
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
 
     steps:
       # =========================
-      # 🔥 拉取你的私库脚本
+      # 🔥 拉取私库脚本
       # =========================
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
           path: scripts
 
       # =========================
-      # 🐍 Python 环境
+      # 🐍 Python环境
       # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -43,7 +43,7 @@ jobs:
           pip install -r requirements.txt
 
       # =========================
-      # 🚀 运行主程序
+      # 🚀 运行脚本
       # =========================
       - name: Run bot
         working-directory: scripts
@@ -51,7 +51,7 @@ jobs:
           python -u main.py --task $TASK_ID
 
       # =========================
-      # 📦 保存日志/调试文件
+      # 📦 上传日志 / 截图
       # =========================
       - name: Upload artifacts
         if: always()
@@ -61,4 +61,3 @@ jobs:
           path: |
             scripts/*.json
             scripts/*.png
-          retention-days: 7
