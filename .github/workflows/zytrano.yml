@@ -1,4 +1,4 @@
-name: CP Zytrano Auto Run
+name: zytrano
 
 on:
   workflow_dispatch:
