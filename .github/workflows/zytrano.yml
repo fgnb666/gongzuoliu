@@ -1,4 +1,4 @@
-name: Zytrano
+name: Zytrano Auto Renew
 
 on:
   schedule:
@@ -20,6 +20,13 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
+      - name: 查看私库文件
+        working-directory: scripts
+        run: |
+          ls -la
+          echo "=== 查找 py 文件 ==="
+          ls -la *.py || echo "没有找到 py 文件"
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -34,7 +41,7 @@ jobs:
         working-directory: scripts
         run: |
           pip install seleniumbase pyvirtualdisplay requests
-          pip install -r requirements.txt || echo "requirements.txt 不存在或已安装"
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
       
       - name: Run renew script
         working-directory: scripts
@@ -42,12 +49,10 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # 启动虚拟显示
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
           export DISPLAY=:99
-          # 运行脚本
-          python monkey.py
+          python main.py
       
       - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
