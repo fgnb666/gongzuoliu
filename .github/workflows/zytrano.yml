@@ -18,7 +18,7 @@ jobs:
       - name: Checkout private config repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb777/weirdhost-zidongxuqi
+          repository: fgnb666/cp.zytrano.top-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
