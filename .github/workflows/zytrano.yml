@@ -1,49 +1,79 @@
-name: zytrano
+name: Zytrano Private Runner
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-    inputs:
-      task_id:
-        description: 'Task ID from private config'
-        required: false
-        default: 'default'
 
 jobs:
-  run:
+  run-private-script:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout private config repo
+      # =========================
+      # 1️⃣ Checkout 当前主仓库
+      # =========================
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      # =========================
+      # 2️⃣ 拉取私库脚本（关键）
+      # =========================
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/cp.zytrano.top-xuqijiaoben
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          repository: fgnb666/cp.zytrano.top-xuqijiaoben   # 👈你的私库
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}    # 👈必须有权限token
           path: scripts
 
+      # =========================
+      # 3️⃣ Python环境
+      # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install deps
+      # =========================
+      # 4️⃣ 安装依赖
+      # =========================
+      - name: Install dependencies
         working-directory: scripts
-        run: pip install -r requirements.txt -q
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run workflow engine
+      # =========================
+      # 5️⃣ Xvfb（无界面运行）
+      # =========================
+      - name: Start Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      # =========================
+      # 6️⃣ 注入账号密码
+      # =========================
+      - name: Set credentials
+        run: |
+          echo "EMAIL=${{ secrets.EMAIL }}" >> $GITHUB_ENV
+          echo "PASSWORD=${{ secrets.PASSWORD }}" >> $GITHUB_ENV
+
+      # =========================
+      # 7️⃣ 运行私库脚本
+      # =========================
+      - name: Run private script
         working-directory: scripts
-        env:
-          HEADLESS: 'true'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TASK_ID: ${{ github.event.inputs.task_id }}
-        run: python main.py --task $TASK_ID
+        run: python main.py --task default
 
-      - name: Upload logs
-        uses: actions/upload-artifact@v4
+      # =========================
+      # 8️⃣ 上传调试文件
+      # =========================
+      - name: Upload debug logs
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: logs
-          path: scripts/*.json
-          retention-days: 7
+          name: debug-report
+          path: scripts/debug.json
