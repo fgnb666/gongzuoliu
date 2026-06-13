@@ -1,4 +1,4 @@
-name: CP Zytrano Auto Bot
+name: zytrano
 
 on:
   workflow_dispatch:
