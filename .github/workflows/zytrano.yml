@@ -1,51 +1,69 @@
-name: zytrano
+name: Zytrano
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+    # 每天 UTC 时间 18:00 运行（北京时间 02:00）
+    - cron: '0 18 * * *'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
-  run:
+  renew:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # =========================
-      # 主仓库代码
-      # =========================
-      - name: Checkout main repo
-        uses: actions/checkout@v4
-
-      # =========================
-      # 🔐 拉取你的私有 cookie 仓库
-      # =========================
-      - name: Checkout private cookie repo
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
-          token: ${{ secrets.PERSONAL_TOKEN }}
-          path: cookie_repo
-
-      # =========================
-      # Python
-      # =========================
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-
-      - name: Install dependencies
-        run: pip install seleniumbase
-
-      # =========================
-      # 复制 cookie 文件
-      # =========================
-      - name: Load remember_web cookie
+          python-version: '3.11'
+      
+      - name: Install system dependencies
         run: |
-          cp cookie_repo/remember_web.json ./remember_web.json
-
-      # =========================
-      # 执行脚本
-      # =========================
-      - name: Run remember_web
-        run: python main.py
+          sudo apt-get update
+          sudo apt-get install -y xvfb chromium-browser
+      
+      - name: Install Python dependencies
+        working-directory: scripts
+        run: |
+          pip install seleniumbase pyvirtualdisplay requests
+          # 如果有 requirements.txt 就安装
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+      
+      - name: Run renew script
+        working-directory: scripts
+        env:
+          DISPLAY: ':99'
+          HEADLESS: 'true'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 账号密码直接从脚本内置了，不需要环境变量
+        run: |
+          # 启动虚拟显示
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 3
+          # 运行脚本（脚本里的账号密码已经写死了 phjkd / yq2606428）
+          python monkey.py
+      
+      - name: Upload debug screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-screenshots
+          path: scripts/*.png
+          retention-days: 7
+      
+      - name: Upload response JSON files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: response-json
+          path: scripts/response_*.json
+          retention-days: 7
