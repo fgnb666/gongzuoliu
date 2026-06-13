@@ -1,48 +1,49 @@
-name: zytrano
+name: Public Workflow Runner
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: 'Task ID from private config'
+        required: false
+        default: 'default'
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: 拉取私有仓库
-      uses: actions/checkout@v4
-      with:
-        repository: fgnb666/cp.zytrano.top-xuqijiaoben
-        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: Checkout private config repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb777/weirdhost-zidongxuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
 
-    - name: 安装 Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: 安装依赖
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xvfb
-        python -m pip install --upgrade pip
-        pip install camoufox playwright
-        python -m camoufox fetch
-        if [ -f requirements.txt ]; then
-          pip install -r requirements.txt
-        fi
+      - name: Install deps
+        working-directory: scripts
+        run: pip install -r requirements.txt -q
 
-    - name: 运行脚本
-      run: |
-        python main.py
+      - name: Run workflow engine
+        working-directory: scripts
+        env:
+          HEADLESS: 'true'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TASK_ID: ${{ github.event.inputs.task_id }}
+        run: python main.py --task $TASK_ID
 
-    - name: 上传结果
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: 运行结果
-        path: |
-          *.png
-          *.log
-          *.txt
-        retention-days: 7
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs
+          path: scripts/*.json
+          retention-days: 7
