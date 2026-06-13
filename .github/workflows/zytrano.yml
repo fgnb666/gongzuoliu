@@ -1,4 +1,4 @@
-name: Zytrano Private Runner
+name: Zytrano
 
 on:
   schedule:
