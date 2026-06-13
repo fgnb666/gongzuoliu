@@ -1,4 +1,4 @@
-name: Public Workflow Runner
+name: zytrano
 
 on:
   schedule:
