@@ -1,63 +1,51 @@
-name: zytrano
+name: remember_web CI
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 4 * * *"
+    - cron: "0 */6 * * *"
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
-    env:
-      EMAIL: ${{ secrets.EMAIL }}
-      PASSWORD: ${{ secrets.PASSWORD }}
-      TASK_ID: default
-
     steps:
       # =========================
-      # 🔥 拉取私库脚本
+      # 主仓库代码
       # =========================
-      - name: Checkout private repo
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      # =========================
+      # 🔐 拉取你的私有 cookie 仓库
+      # =========================
+      - name: Checkout private cookie repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/cp.zytrano.top-xuqijiaoben
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: scripts
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          path: cookie_repo
 
       # =========================
-      # 🐍 Python环境
+      # Python
       # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
 
-      # =========================
-      # 📦 安装依赖
-      # =========================
       - name: Install dependencies
-        working-directory: scripts
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install seleniumbase
 
       # =========================
-      # 🚀 运行脚本
+      # 复制 cookie 文件
       # =========================
-      - name: Run bot
-        working-directory: scripts
+      - name: Load remember_web cookie
         run: |
-          python -u main.py --task $TASK_ID
+          cp cookie_repo/remember_web.json ./remember_web.json
 
       # =========================
-      # 📦 上传日志 / 截图
+      # 执行脚本
       # =========================
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug
-          path: |
-            scripts/*.json
-            scripts/*.png
+      - name: Run remember_web
+        run: python main.py
