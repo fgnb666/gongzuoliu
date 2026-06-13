@@ -1,4 +1,4 @@
-name: remember_web CI
+name: zytrano
 
 on:
   workflow_dispatch:
