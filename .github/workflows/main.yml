@@ -1,0 +1,77 @@
+name: Weirdhost Auto Renew
+
+on:
+  schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/dash.aclclouds.com-zidongxuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: scripts
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt -q > /dev/null 2>&1
+          fi
+          # 安装 seleniumbase（如果 requirements.txt 里没有）
+          pip install seleniumbase pyvirtualdisplay -q > /dev/null 2>&1
+      
+      - name: Setup Chrome and Xvfb for headless mode
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb google-chrome-stable
+          echo "✅ Chrome and Xvfb installed"
+      
+      - name: Run renew script
+        working-directory: scripts
+        env:
+          HEADLESS: 'true'
+          # Weirdhost 登录凭证
+          WEIRDHOST_EMAIL: ${{ secrets.WEIRDHOST_EMAIL }}
+          WEIRDHOST_PASSWORD: ${{ secrets.WEIRDHOST_PASSWORD }}
+          # Telegram 通知配置
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # 设置显示环境变量
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1920x1080x24 &
+          XVFB_PID=$!
+          
+          # 运行脚本
+          python main.py
+          
+          # 清理 Xvfb
+          kill $XVFB_PID || true
+      
+      - name: Upload response JSON files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: response-json
+          path: scripts/response_*.json
+          retention-days: 7
+      
+      - name: Upload debug screenshot (if exists)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: debug-screenshot
+          path: scripts/*.png
+          retention-days: 3
