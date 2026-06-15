@@ -1,4 +1,4 @@
-name: Weirdhost Auto Renew
+name: ACL
 
 on:
   schedule:
@@ -26,52 +26,31 @@ jobs:
       - name: Install dependencies
         working-directory: scripts
         run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt -q > /dev/null 2>&1
-          fi
-          # 安装 seleniumbase（如果 requirements.txt 里没有）
-          pip install seleniumbase pyvirtualdisplay -q > /dev/null 2>&1
+          pip install -r requirements.txt -q > /dev/null 2>&1
       
-      - name: Setup Chrome and Xvfb for headless mode
+      - name: Setup Chrome and Xvfb
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb google-chrome-stable
-          echo "✅ Chrome and Xvfb installed"
       
       - name: Run renew script
         working-directory: scripts
         env:
           HEADLESS: 'true'
-          # Weirdhost 登录凭证
-          WEIRDHOST_EMAIL: ${{ secrets.WEIRDHOST_EMAIL }}
-          WEIRDHOST_PASSWORD: ${{ secrets.WEIRDHOST_PASSWORD }}
-          # Telegram 通知配置
+          ACL_REMEMBER_WEB: ${{ secrets.ACL_REMEMBER_WEB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # 设置显示环境变量
           export DISPLAY=:99
           Xvfb :99 -screen 0 1920x1080x24 &
           XVFB_PID=$!
-          
-          # 运行脚本
           python main.py
-          
-          # 清理 Xvfb
           kill $XVFB_PID || true
       
-      - name: Upload response JSON files
+      - name: Upload debug screenshot
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: response-json
-          path: scripts/response_*.json
+          name: acl-screenshot
+          path: /tmp/acl_dashboard.png
           retention-days: 7
-      
-      - name: Upload debug screenshot (if exists)
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: debug-screenshot
-          path: scripts/*.png
-          retention-days: 3
