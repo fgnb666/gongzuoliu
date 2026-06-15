@@ -1,31 +1,29 @@
-name: Katabump
+name: Katabump Auto Renew & Clicker
 
 on:
   schedule:
     # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-    # 可选：每天多时段运行
-    # - cron: '0 10 * * *'  # 北京时间 18:00
-    # - cron: '0 16 * * *'  # 北京时间 00:00
   workflow_dispatch:  # 支持手动触发
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'katabump.py'
-      - '.github/workflows/katabump-renew.yml'
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 防止长时间运行
+    timeout-minutes: 15
     
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/dash.aclclouds.com-zidongxuqi
+          repository: fgnb666/dashboard.katabump.com-zidongxuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
+      
+      - name: List files in repo
+        run: |
+          echo "=== 检查私库文件 ==="
+          ls -la scripts/
+          echo "==================="
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -33,21 +31,16 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        working-directory: scripts
         run: |
-          pip install -r requirements.txt -q
-          # 确保关键包已安装
           pip install seleniumbase pyvirtualdisplay requests
       
       - name: Setup Chrome and Xvfb
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb google-chrome-stable
-          # 安装中文字体支持（防止渲染问题）
           sudo apt-get install -y fonts-wqy-zenhei fonts-wqy-microhei
       
       - name: Run katabump script
-        working-directory: scripts
         env:
           HEADLESS: 'true'
           KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
@@ -60,24 +53,29 @@ jobs:
           Xvfb :99 -screen 0 1920x1080x24 &
           XVFB_PID=$!
           
-          # 运行脚本
-          python katabump.py
+          # 检查脚本是否存在
+          if [ -f "scripts/katabump.py" ]; then
+            echo "✅ 找到脚本文件 katabump.py"
+            python scripts/katabump.py
+          elif [ -f "scripts/monkey.py" ]; then
+            echo "⚠️ 找到 monkey.py，尝试运行"
+            python scripts/monkey.py
+          else
+            echo "❌ 未找到脚本文件！"
+            echo "当前 scripts 目录内容："
+            ls -la scripts/
+            exit 1
+          fi
           
-          # 清理
           kill $XVFB_PID || true
       
       - name: Upload debug screenshot
         uses: actions/upload-artifact@v4
-        if: always()  # 即使失败也上传截图
+        if: always()
         with:
           name: katabump-debug
           path: |
             /tmp/katabump_*.png
             /tmp/page_source_*.html
+            /tmp/acl_dashboard.png
           retention-days: 7
-      
-      - name: Clean up old artifacts
-        if: always()
-        run: |
-          # 清理超过7天的artifact（GitHub会自动清理，这步可选）
-          echo "Artifacts will be kept for 7 days by retention policy"
