@@ -1,4 +1,4 @@
-name: Katabump
+name: Katabump Auto Renew & Clicker
 
 on:
   schedule:
@@ -33,6 +33,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install seleniumbase pyvirtualdisplay requests
+          # 如果 requirements.txt 有其他依赖也安装
+          if [ -f "scripts/requirements.txt" ]; then
+            pip install -r scripts/requirements.txt
+          fi
       
       - name: Setup Chrome and Xvfb
         run: |
@@ -43,8 +47,9 @@ jobs:
       - name: Run katabump script
         env:
           HEADLESS: 'true'
-          KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
-          KATABUMP_PASSWORD: ${{ secrets.KATABUMP_PASSWORD }}
+          # 传递给 main.py 的环境变量（根据原脚本需要的变量名）
+          monkey_email: ${{ secrets.KATABUMP_EMAIL }}
+          monkey_password: ${{ secrets.KATABUMP_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MONKEY_API_KEY: ${{ secrets.MONKEY_API_KEY }}
@@ -53,19 +58,9 @@ jobs:
           Xvfb :99 -screen 0 1920x1080x24 &
           XVFB_PID=$!
           
-          # 检查脚本是否存在
-          if [ -f "scripts/katabump.py" ]; then
-            echo "✅ 找到脚本文件 katabump.py"
-            python scripts/katabump.py
-          elif [ -f "scripts/monkey.py" ]; then
-            echo "⚠️ 找到 monkey.py，尝试运行"
-            python scripts/monkey.py
-          else
-            echo "❌ 未找到脚本文件！"
-            echo "当前 scripts 目录内容："
-            ls -la scripts/
-            exit 1
-          fi
+          # 直接运行私库中的 main.py
+          echo "✅ 运行 scripts/main.py"
+          python scripts/main.py
           
           kill $XVFB_PID || true
       
@@ -75,7 +70,7 @@ jobs:
         with:
           name: katabump-debug
           path: |
-            /tmp/katabump_*.png
-            /tmp/page_source_*.html
+            /tmp/*.png
+            /tmp/*.html
             /tmp/acl_dashboard.png
           retention-days: 7
