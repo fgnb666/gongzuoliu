@@ -2,9 +2,8 @@ name: HNHost
 
 on:
   schedule:
-    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
     - cron: '0 16 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -22,10 +21,6 @@ jobs:
         working-directory: scripts
         run: |
           ls -la
-          echo "=== 查找 py 文件 ==="
-          ls -la *.py || echo "没有找到 py 文件"
-          echo "=== 查找 session 文件 ==="
-          ls -la *.json || echo "没有找到 json 文件"
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -40,7 +35,7 @@ jobs:
       - name: Install Python dependencies
         working-directory: scripts
         run: |
-          pip install camoufox pyvirtualdisplay requests
+          pip install camoufox[geoip] pyvirtualdisplay requests
           playwright install firefox
       
       - name: Run renew script
