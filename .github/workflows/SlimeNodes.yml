@@ -1,4 +1,4 @@
-name: SlimeNodes 自动续期
+name: SlimeNodes
 
 on:
   schedule:
