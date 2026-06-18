@@ -1,4 +1,4 @@
-name: SlimeNodes
+name: SlimeNodes 自动续期
 
 on:
   schedule:
@@ -8,6 +8,7 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -15,6 +16,13 @@ jobs:
           repository: fgnb666/dash.slimenodes.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
+      
+      - name: 查看私库文件
+        working-directory: scripts
+        run: |
+          ls -la
+          echo "=== 查找 py 文件 ==="
+          ls -la *.py || echo "没有找到 py 文件"
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,12 +39,38 @@ jobs:
         run: |
           pip install seleniumbase pyvirtualdisplay requests
       
-      - name: 恢复会话 Cookie
+      - name: 恢复会话 Cookie（修复版）
         working-directory: scripts
         env:
           SESSION_JSON: ${{ secrets.SLIMENODES_SESSION }}
         run: |
+          # 检查 Secret 是否为空
+          if [ -z "$SESSION_JSON" ]; then
+            echo "❌ 错误: SLIMENODES_SESSION Secret 未设置或为空"
+            exit 1
+          fi
+          
+          # 写入文件
           echo "$SESSION_JSON" > SLIMENODES_SESSION.json
+          
+          # 验证文件
+          echo "✅ 会话文件已创建"
+          ls -la SLIMENODES_SESSION.json
+          
+          # 显示文件大小和前100字符（用于调试）
+          echo "📦 文件大小: $(wc -c < SLIMENODES_SESSION.json) 字节"
+          echo "📄 文件内容前100字符:"
+          head -c 100 SLIMENODES_SESSION.json
+          echo ""
+          
+          # 验证 JSON 格式
+          if python -c "import json; json.load(open('SLIMENODES_SESSION.json'))" 2>/dev/null; then
+            echo "✅ JSON 格式验证通过"
+          else
+            echo "❌ JSON 格式验证失败"
+            cat SLIMENODES_SESSION.json
+            exit 1
+          fi
       
       - name: Run renew script
         working-directory: scripts
