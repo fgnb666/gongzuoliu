@@ -1,15 +1,13 @@
-name: SlimeNodes
+name: SlimeNodes 自动续期
 
 on:
   schedule:
-    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
     - cron: '0 16 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -17,15 +15,6 @@ jobs:
           repository: fgnb666/dash.slimenodes.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: 查看私库文件
-        working-directory: scripts
-        run: |
-          ls -la
-          echo "=== 查找 py 文件 ==="
-          ls -la *.py || echo "没有找到 py 文件"
-          echo "=== 查找 session 文件 ==="
-          ls -la *.json || echo "没有找到 json 文件"
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -35,13 +24,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb chromium-browser
+          sudo apt-get install -y xvfb
       
       - name: Install Python dependencies
         working-directory: scripts
         run: |
           pip install seleniumbase pyvirtualdisplay requests
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
       
       - name: 恢复会话 Cookie
         working-directory: scripts
@@ -49,8 +37,6 @@ jobs:
           SESSION_JSON: ${{ secrets.SLIMENODES_SESSION }}
         run: |
           echo "$SESSION_JSON" > SLIMENODES_SESSION.json
-          echo "✅ 会话文件已恢复"
-          ls -la SLIMENODES_SESSION.json
       
       - name: Run renew script
         working-directory: scripts
@@ -61,7 +47,7 @@ jobs:
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
           export DISPLAY=:99
-          python slimenodes_renew.py
+          python main.py
       
       - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
@@ -69,12 +55,4 @@ jobs:
         with:
           name: debug-screenshots
           path: scripts/*.png
-          retention-days: 7
-      
-      - name: Upload response JSON files
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: response-json
-          path: scripts/response_*.json
           retention-days: 7
