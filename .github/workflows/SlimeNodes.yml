@@ -1,4 +1,4 @@
-name: SlimeNodes
+name: HNHost
 
 on:
   schedule:
@@ -13,16 +13,9 @@ jobs:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/dash.slimenodes.com-xuqi
+          repository: fgnb666/client.hnhost.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: 查看私库文件
-        working-directory: scripts
-        run: |
-          ls -la
-          echo "=== 查找 Cookie 文件 ==="
-          cat SLIMENODES_SESSION.json | head -c 200 || echo "Cookie 文件不存在"
       
       - name: Setup Python
         uses: actions/setup-python@v5
