@@ -2,10 +2,8 @@ name: ACLClouds
 
 on:
   schedule:
-    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
-    - cron: '0 4 * * *'
-    # 每天 UTC 时间 18:00 运行（北京时间 02:00）
-    - cron: '0 18 * * *'
+    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
+    - cron: '0 16 * * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
@@ -16,7 +14,7 @@ jobs:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/dash.aclclouds.com-xuqi  # 改成你的私库名
+          repository: fgnb666/dash.aclclouds.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
