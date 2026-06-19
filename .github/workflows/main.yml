@@ -1,0 +1,44 @@
+name: Gaming4Free
+
+on:
+  schedule:
+    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
+    - cron: '0 16 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/control.gaming4free.net-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: scripts
+        run: |
+          pip install playwright
+          playwright install chromium
+      
+      - name: Run login
+        working-directory: scripts
+        run: |
+          python main.py
+      
+      - name: Upload debug screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: scripts/*.png
+          retention-days: 7
