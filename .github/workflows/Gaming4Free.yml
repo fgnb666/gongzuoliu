@@ -2,7 +2,8 @@ name: Gaming4Free
 
 on:
   schedule:
-    - cron: '0 16 * * *'
+    # 每小时运行一次
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,13 +24,6 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-          # 预装 Warp 依赖
-          sudo apt-get install -y curl wget gnupg
-      
       - name: Install dependencies
         working-directory: scripts
         run: |
@@ -38,8 +32,6 @@ jobs:
       - name: Run renew
         working-directory: scripts
         env:
-          DISPLAY: ':99'
+          SOCKS5_PROXY: ${{ secrets.SOCKS5_PROXY }}
         run: |
-          Xvfb :99 -screen 0 1920x1080x24 &
-          sleep 5
           python main.py
