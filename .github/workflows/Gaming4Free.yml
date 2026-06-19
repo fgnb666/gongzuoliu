@@ -23,12 +23,23 @@ jobs:
         with:
           python-version: '3.11'
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          # 预装 Warp 依赖
+          sudo apt-get install -y curl wget gnupg
+      
       - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install seleniumbase
+          pip install seleniumbase pyvirtualdisplay
       
       - name: Run renew
         working-directory: scripts
+        env:
+          DISPLAY: ':99'
         run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 5
           python main.py
