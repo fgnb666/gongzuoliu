@@ -2,9 +2,8 @@ name: HNHost
 
 on:
   schedule:
-    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
     - cron: '0 16 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -19,31 +18,17 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
-      - name: 查看私库文件
-        working-directory: scripts
-        run: |
-          ls -la
-          echo "=== 查找 py 文件 ==="
-          ls -la *.py || echo "没有找到 py 文件"
-          echo "=== 查找配置文件 ==="
-          ls -la config.json || echo "没有找到 config.json"
-      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: scripts
         run: |
           pip install seleniumbase pyvirtualdisplay requests
       
-      - name: Run renew script
+      - name: Run renew
         working-directory: scripts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -55,9 +40,9 @@ jobs:
           python main.py
       
       - name: Upload debug screenshots
+        if: failure()
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: debug-screenshots-${{ github.run_number }}
+          name: debug-screenshots
           path: scripts/*.png
           retention-days: 7
