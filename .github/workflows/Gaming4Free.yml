@@ -1,10 +1,12 @@
 name: Gaming4Free
 
 on:
+  schedule:
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
-  login:
+  renew:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -26,35 +28,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
       
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install seleniumbase
       
-      - name: Run login
+      - name: Run renew
         working-directory: scripts
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISPLAY: ':99'
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
-          export DISPLAY=:99
-          python main.py
-      
-      - name: Upload session file
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: session
-          path: scripts/GAMING4FREE_SESSION.json
-          retention-days: 7
-      
-      - name: Upload debug screenshots
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-screenshots
-          path: scripts/*.png
-          retention-days: 7
+          python renew.py
