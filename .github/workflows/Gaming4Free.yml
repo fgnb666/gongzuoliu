@@ -8,7 +8,7 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     
     steps:
       - name: Checkout private repo
@@ -23,11 +23,6 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      
       - name: Install dependencies
         working-directory: scripts
         run: |
@@ -35,9 +30,5 @@ jobs:
       
       - name: Run renew
         working-directory: scripts
-        env:
-          DISPLAY: ':99'
         run: |
-          Xvfb :99 -screen 0 1920x1080x24 &
-          sleep 3
           python main.py
