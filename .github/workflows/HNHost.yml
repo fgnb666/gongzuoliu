@@ -2,15 +2,17 @@ name: HNHost
 
 on:
   schedule:
-    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
+    # 每天 UTC 16:00（北京时间 00:00）
     - cron: '0 16 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: scripts
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -18,28 +20,28 @@ jobs:
           repository: fgnb666/client.hnhost.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+          cache: 'pip'
+
+      - name: Install Xvfb
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Install dependencies
-        working-directory: scripts
         run: |
           pip install seleniumbase pyvirtualdisplay requests
-      
+          seleniumbase install chromedriver
+
       - name: Run renew
-        working-directory: scripts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          Xvfb :99 -screen 0 1920x1080x24 &
-          sleep 3
-          export DISPLAY=:99
-          python main.py
-      
+        run: python main.py
+
       - name: Upload debug screenshots
         if: failure()
         uses: actions/upload-artifact@v4
