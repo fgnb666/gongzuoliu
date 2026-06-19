@@ -1,8 +1,6 @@
 name: Gaming4Free
 
 on:
-  schedule:
-    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,17 +21,26 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Install Python dependencies
         working-directory: scripts
         run: |
           pip install --upgrade pip
-          pip install playwright
-          playwright install chromium
-          playwright install-deps
+          pip install -r requirements.txt
       
       - name: Run login
         working-directory: scripts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 3
+          export DISPLAY=:99
           python main.py
       
       - name: Upload session file
