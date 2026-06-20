@@ -1,255 +1,65 @@
-# -*- coding: utf-8 -*-
+name: HNHost
 
-import os
-import time
-import requests
-import re
-import json
-from datetime import datetime, timedelta
+on:
+  schedule:
+    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
+    - cron: '0 16 * * *'
+  workflow_dispatch:  # 支持手动触发
 
-from seleniumbase import SB
-from pyvirtualdisplay import Display
-
-# ========== 网站配置 ==========
-BASE = "https://client.hnhost.net"
-LOGIN_URL = f"{BASE}/index.php"
-API_BASE = f"{BASE}/middleware/localApi"
-
-# ========== 用户 ID ==========
-USER_ID = "6915a6234edef"
-
-# ========== 会话文件 ==========
-SESSION_FILE = "HNHOST_SESSION.json"
-
-# ========== TG配置 ==========
-TG_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-
-def setup_display():
-    if not os.environ.get("DISPLAY"):
-        display = Display(visible=0, size=(1920, 1080))
-        display.start()
-        print("🖥️ Xvfb 启动")
-        return display
-    return None
-
-
-def load_cookies_from_session():
-    """从会话文件加载 Cookie"""
-    if not os.path.exists(SESSION_FILE):
-        print(f"❌ 会话文件不存在: {SESSION_FILE}")
-        return None
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     
-    try:
-        with open(SESSION_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        cookies = data.get('cookies', [])
-        if not cookies:
-            print("❌ 会话文件没有 Cookie")
-            return None
-        
-        valid_cookies = []
-        for c in cookies:
-            domain = c.get('domain', '')
-            if 'hnhost.net' in domain:
-                valid_cookies.append(c)
-        
-        print(f"✅ 加载了 {len(valid_cookies)} 个 Cookie")
-        return valid_cookies
-    except Exception as e:
-        print(f"❌ 加载会话失败: {e}")
-        return None
-
-
-def bypass_cloudflare_and_login(sb):
-    """过盾 + 登录"""
-    cookies = load_cookies_from_session()
-    if not cookies:
-        print("💡 请先运行 session.py 获取会话")
-        return False
-    
-    print(f"🌍 打开: {LOGIN_URL}")
-    # ========== 关键：使用 uc_open_with_reconnect 过盾 ==========
-    sb.uc_open_with_reconnect(LOGIN_URL, reconnect_time=6)
-    time.sleep(3)
-    
-    print("🍪 注入 Cookie...")
-    for cookie in cookies:
-        try:
-            cookie_name = cookie.get('name')
-            cookie_value = cookie.get('value')
-            cookie_domain = cookie.get('domain', 'client.hnhost.net')
-            
-            # 修复 domain
-            if cookie_domain.startswith('.'):
-                cookie_domain = cookie_domain[1:]
-            if 'client.hnhost.net' in cookie_domain:
-                cookie_domain = 'client.hnhost.net'
-            elif 'hnhost.net' in cookie_domain:
-                cookie_domain = 'hnhost.net'
-            
-            cookie_dict = {
-                'name': cookie_name,
-                'value': cookie_value,
-                'domain': cookie_domain,
-                'path': cookie.get('path', '/'),
-                'secure': cookie.get('secure', False),
-                'httpOnly': cookie.get('httpOnly', False)
-            }
-            if cookie.get('expires') and cookie.get('expires') != -1:
-                cookie_dict['expiry'] = int(cookie.get('expires'))
-            
-            print(f"  🍪 {cookie_name} -> domain: {cookie_domain}")
-            sb.add_cookie(cookie_dict)
-        except Exception as e:
-            print(f"  ⚠️ 添加 Cookie 失败: {cookie.get('name')} - {e}")
-    
-    print("🔄 刷新页面...")
-    sb.refresh()
-    time.sleep(3)
-    
-    current_url = sb.get_current_url()
-    print(f"📍 当前 URL: {current_url}")
-    
-    if "login" in current_url:
-        print("❌ Cookie 无效，已过期")
-        return False
-    
-    print("✅ Cookie 有效，已登录")
-    return True
-
-
-def get_expiry(sb):
-    """获取到期时间"""
-    try:
-        page_source = sb.get_page_source()
-        match = re.search(r'\d{4}/\d{2}/\d{2}', page_source)
-        if match:
-            return match.group(0)
-        return None
-    except:
-        return None
-
-
-def call_api_via_browser(sb, fx, params=None):
-    """通过浏览器调用 API（过盾后）"""
-    url = f"{API_BASE}/homeInfoApi.php"
-    all_params = {'fx': fx, 'userId': USER_ID}
-    if params:
-        all_params.update(params)
-    
-    full_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in all_params.items()])}"
-    print(f"🌍 请求: {full_url}")
-    
-    try:
-        sb.open(full_url)
-        time.sleep(2)
-        page_text = sb.get_page_source()
-        print(f"  📄 响应: {page_text[:200]}")
-        return page_text
-    except Exception as e:
-        print(f"  ❌ 请求失败: {e}")
-        return None
-
-
-def renew_servers(sb):
-    """续期 + 领取奖励（过盾后）"""
-    print("\n" + "="*50)
-    sb.save_screenshot("debug_page.png")
-    
-    expiry = get_expiry(sb)
-    if expiry:
-        print(f"📅 当前到期: {expiry}")
-    
-    # ========== 续期 ==========
-    print(f"\n📌 服务器 ID: c95179d2")
-    resp1 = call_api_via_browser(sb, 'renewServer', {'serverId': 'c95179d2'})
-    
-    # ========== 领取奖励 ==========
-    time.sleep(2)
-    resp2 = call_api_via_browser(sb, 'dailyReward', {'event': 'dailyReward'})
-    
-    # ========== 验证 ==========
-    time.sleep(2)
-    sb.open(LOGIN_URL)
-    time.sleep(3)
-    new_expiry = get_expiry(sb)
-    if new_expiry:
-        print(f"📅 更新后到期: {new_expiry}")
-    
-    result = f"📅 到期: {new_expiry if new_expiry else '未知'}\n"
-    if resp1 and 'success' in resp1.lower():
-        result += "🔄 续期: ✅ 续期成功\n"
-    elif resp1 and 'already' in resp1.lower():
-        result += "🔄 续期: ⏰ 已续期过\n"
-    else:
-        result += f"🔄 续期: {resp1[:50] if resp1 else '无响应'}\n"
-    
-    if resp2 and 'success' in resp2.lower():
-        result += "🎁 奖励: ✅ 领取成功\n"
-    elif resp2 and 'already' in resp2.lower():
-        result += "🎁 奖励: ℹ️ 今天已领取\n"
-    else:
-        result += f"🎁 奖励: {resp2[:50] if resp2 else '无响应'}\n"
-    
-    return result
-
-
-def send_tg(text):
-    if not TG_TOKEN or not TG_CHAT_ID:
-        print("⚠️ 未設置TG通知")
-        return
-    try:
-        requests.post(
-            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-            json={"chat_id": TG_CHAT_ID, "text": text[:4096]},
-            timeout=10
-        )
-        print("✅ TG通知已發送")
-    except Exception as e:
-        print(f"❌ TG發送失敗: {e}")
-
-
-def main():
-    print("🏠 HNHost 自動續期腳本 (过盾版)")
-    print(f"📌 用户 ID: {USER_ID}")
-    print(f"📂 会话文件: {SESSION_FILE}")
-    
-    display = setup_display()
-    
-    report = "🏠 HNHost 自動續期報告\n\n"
-    
-    try:
-        # ========== 关键：SB(uc=True) 过盾 ==========
-        with SB(uc=True, headless=False) as sb:
-            if not bypass_cloudflare_and_login(sb):
-                report += "❌ 登錄失敗（會話已過期）\n"
-                report += "💡 請運行 python session.py 重新獲取會話\n"
-            else:
-                status = renew_servers(sb)
-                report += status
-                
-    except Exception as e:
-        print(f"❌ 執行失敗: {e}")
-        report += f"❌ 執行失敗: {e}\n"
-        import traceback
-        traceback.print_exc()
-    
-    finally:
-        if display:
-            display.stop()
-    
-    bj_time = datetime.utcnow() + timedelta(hours=8)
-    report += f"\n\n⏱ {bj_time.strftime('%Y-%m-%d %H:%M:%S')}"
-    
-    print("\n" + "="*50)
-    print(report)
-    print("="*50)
-    
-    send_tg(report)
-
-
-if __name__ == "__main__":
-    main()
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/client.hnhost.net-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      - name: 查看私库文件
+        working-directory: scripts
+        run: |
+          ls -la
+          echo "=== 查找 py 文件 ==="
+          ls -la *.py || echo "没有找到 py 文件"
+          echo "=== 查找配置文件 ==="
+          ls -la config.json || echo "没有找到 config.json"
+          echo "=== 查找会话文件 ==="
+          ls -la HNHOST_SESSION.json || echo "没有找到会话文件"
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Install Python dependencies
+        working-directory: scripts
+        run: |
+          pip install seleniumbase pyvirtualdisplay requests
+      
+      - name: Run renew script
+        working-directory: scripts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 3
+          export DISPLAY=:99
+          python main.py
+      
+      - name: Upload debug screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-screenshots-${{ github.run_number }}
+          path: scripts/*.png
+          retention-days: 7
