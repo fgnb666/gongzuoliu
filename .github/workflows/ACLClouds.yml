@@ -1,4 +1,4 @@
-name: ACLClouds Auto Renew
+name: ACLClouds
 
 on:
   schedule:
