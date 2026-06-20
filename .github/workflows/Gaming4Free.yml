@@ -2,14 +2,13 @@ name: Gaming4Free
 
 on:
   schedule:
-    # 每小时运行一次
     - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     
     steps:
       - name: Checkout private repo
@@ -27,11 +26,11 @@ jobs:
       - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install seleniumbase pyvirtualdisplay
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
       
       - name: Run renew
         working-directory: scripts
-        env:
-          SOCKS5_PROXY: ${{ secrets.SOCKS5_PROXY }}
         run: |
           python main.py
