@@ -29,7 +29,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install seleniumbase pyvirtualdisplay requests
+          sudo apt-get update
+          sudo apt-get install -y xvfb chromium-browser
 
       - name: Setup Cloudflare WARP
         run: |
@@ -50,7 +52,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python main.py
+          xvfb-run -a python main.py
 
       - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
