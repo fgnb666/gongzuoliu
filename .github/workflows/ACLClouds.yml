@@ -9,29 +9,29 @@ jobs:
   renew:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 下载私库脚本
+      - name: Download private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/dash.aclclouds.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
-      - name: 📂 移动脚本到工作目录
+      - name: Move files
         run: |
           mv private/main.py main.py
           mv private/aclclouds_session.json aclclouds_session.json || true
 
-      - name: 设置 Python 环境
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 安装 Python 依赖
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: 安装并配置 Cloudflare WARP
+      - name: Setup Cloudflare WARP
         run: |
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
@@ -43,16 +43,16 @@ jobs:
           warp-cli --accept-tos connect
           
           sleep 5
-          echo "✅ WARP 初始化完成"
+          echo "WARP initialized"
 
-      - name: 运行续期脚本
+      - name: Run renew script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python main.py
 
-      - name: 📸 上传调试截图
+      - name: Upload debug screenshots
         uses: actions/upload-artifact@v4
         if: always()
         with:
