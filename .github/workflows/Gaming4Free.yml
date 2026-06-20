@@ -23,6 +23,11 @@ jobs:
         with:
           python-version: '3.10'
       
+      - name: Install dependencies
+        working-directory: scripts
+        run: |
+          pip install DrissionPage requests
+      
       - name: Install WARP
         run: |
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
@@ -34,11 +39,6 @@ jobs:
           warp-cli --accept-tos connect
           sleep 5
           echo "WARP 已连接"
-      
-      - name: Install dependencies
-        working-directory: scripts
-        run: |
-          pip install DrissionPage requests
       
       - name: Run renew
         working-directory: scripts
