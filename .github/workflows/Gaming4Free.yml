@@ -1,4 +1,4 @@
-name: Gaming4Free
+name: ACLClouds Auto Renew
 
 on:
   schedule:
@@ -6,18 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-addtime:
+  renew:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 下载私库脚本
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/control.gaming4free.net-xuqi
+          repository: ${{ github.repository_owner }}/aclclouds-xuqijiaoben
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
       - name: 📂 移动脚本到工作目录
-        run: mv private/main.py main.py
+        run: |
+          mv private/main.py main.py
+          mv private/aclclouds_session.json aclclouds_session.json || true
 
       - name: 设置 Python 环境
         uses: actions/setup-python@v5
@@ -28,11 +30,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install DrissionPage requests
+          
           sudo apt-get update
-          sudo apt-get install -y xvfb
-          sudo apt-get install -y chromium-browser
+          sudo apt-get install -y xvfb chromium-browser
 
-      - name: 安装并配置 Cloudflare WARP CLI
+      - name: 安装并配置 Cloudflare WARP
         run: |
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
@@ -44,7 +46,7 @@ jobs:
           warp-cli --accept-tos connect
           
           sleep 5
-          echo "WARP 初始化完成"
+          echo "✅ WARP 初始化完成"
 
       - name: 运行续期脚本
         env:
@@ -52,3 +54,11 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           xvfb-run -a python main.py
+
+      - name: 📸 上传调试截图
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-screenshots
+          path: ./*.png
+          retention-days: 7
