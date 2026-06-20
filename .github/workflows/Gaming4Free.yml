@@ -1,21 +1,20 @@
-name: Gaming4Free
+name: HNHost
 
 on:
   schedule:
-    # 每小时运行一次
-    - cron: '0 * * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     
     steps:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/control.gaming4free.net-xuqi
+          repository: fgnb666/client.hnhost.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
@@ -27,11 +26,23 @@ jobs:
       - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install seleniumbase pyvirtualdisplay
+          pip install seleniumbase pyvirtualdisplay requests
       
       - name: Run renew
         working-directory: scripts
         env:
-          SOCKS5_PROXY: ${{ secrets.SOCKS5_PROXY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 3
+          export DISPLAY=:99
           python main.py
+      
+      - name: Upload debug screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: scripts/*.png
+          retention-days: 7
