@@ -1,51 +1,62 @@
-name: Monkey Clicker Auto
+name: Monkey Auto
 
 on:
+  # 每天 UTC 18:00 自动运行
   schedule:
-    - cron: "0 4 * * *"
-    - cron: "0 12 * * *"
+    - cron: '10 18 * * *'
+
+  # 手动运行
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  clicker:
+  monkey:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout private repo
+      # =========================
+      # 📥 检出私库 monkey-zidongxuqi
+      # =========================
+      - name: Checkout private repo (monkey-zidongxuqi)
         uses: actions/checkout@v4
         with:
           repository: fgnb666/monkey-zidongxuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
+      # =========================
+      # 🐍 Python
+      # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      - name: Install dependencies
+      # =========================
+      # 📦 安装依赖
+      # =========================
+      - name: Install deps
         working-directory: scripts
-        run: |
-          pip install -r requirements.txt
-
-      - name: Install Chrome
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          sudo apt-get install -y xvfb
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run clicker script
+      # =========================
+      # 🚀 执行脚本
+      # =========================
+      - name: Run Monkey
         working-directory: scripts
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          monkey_email: ${{ secrets.MONKEY_EMAIL }}
+          monkey_password: ${{ secrets.MONKEY_PASSWORD }}
+          MONKEY_API_KEY: ${{ secrets.MONKEY_API_KEY }}
+
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           python monkey.py
-
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots
-          path: scripts/*.png
-          retention-days: 7
