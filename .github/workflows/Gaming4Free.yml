@@ -2,7 +2,7 @@ name: Gaming4Free
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -21,16 +21,17 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
       
       - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install playwright
-          playwright install chromium
-          playwright install-deps
+          pip install DrissionPage requests
       
       - name: Run renew
         working-directory: scripts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python main.py
