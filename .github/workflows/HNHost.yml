@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 📥 拉取私库脚本
+      - name: fgnb666/client.hnhost.net-xuqi
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/client.hnhost.net-xuqi  # ← 改成你的私库
+          repository: ${{ github.repository_owner }}/ActionNode-Start-Private
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
