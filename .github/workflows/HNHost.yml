@@ -38,6 +38,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOST_PROXY: "1"
+          PROXY: ${{ secrets.PROXY_URL }}  # ⭐ 从 Secrets 读取代理
         run: |
           python main.py
 
