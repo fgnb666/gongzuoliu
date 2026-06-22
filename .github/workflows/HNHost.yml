@@ -18,18 +18,21 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
-      - name: 📂 复制脚本
-        run: |
-          cp private/hnhost_coins.sh ./
-          chmod +x hnhost_coins.sh
-
-      - name: 🪙 执行签到
+      - name: 🪙 签到
         env:
           HNHOST_ACCOUNT: ${{ secrets.HNHOST_ACCOUNT }}
           TG_BOT: ${{ secrets.TG_BOT }}
         run: |
-          if [ -z "$HNHOST_ACCOUNT" ]; then
-            echo "❌ 请设置 Secret: HNHOST_ACCOUNT"
-            exit 1
-          fi
+          cp private/hnhost_coins.sh ./
+          chmod +x hnhost_coins.sh
           ./hnhost_coins.sh
+
+      - name: 🔄 续期
+        if: ${{ hashFiles('private/main.py') != '' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mv private/main.py ./
+          pip install seleniumbase requests
+          python main.py
