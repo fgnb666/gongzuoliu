@@ -2,13 +2,14 @@ name: HNHost
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # 每天 UTC 16:00 (北京时间 0:00)
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
   checkin:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    
     steps:
       - name: 📥 拉取私库脚本
         uses: actions/checkout@v4
@@ -18,7 +19,9 @@ jobs:
           path: private
 
       - name: 📂 复制签到脚本
-        run: cp private/hnhost_coins.sh hnhost_coins.sh
+        run: |
+          cp private/hnhost_coins.sh hnhost_coins.sh
+          chmod +x hnhost_coins.sh
 
       - name: 🛡️ 启动 GOST 代理转发
         if: ${{ secrets.PROXY_URL != '' }}
@@ -32,19 +35,28 @@ jobs:
           chmod +x gost
           nohup ./gost -L http://:8080 -F "$PROXY_URL" > gost.log 2>&1 &
           sleep 3
-          echo "✅ GOST 已启动，测试连通性..."
-          curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\.[0-9]*$/.**/' && echo
+          echo "✅ GOST 已启动"
+          curl -s -x http://127.0.0.1:8080 https://api.ipify.org || echo "⚠️ 代理测试失败"
 
-      - name: 🪙 执行每日签到
+      - name: 🪙 执行签到
         env:
           HNHOST_ACCOUNT: ${{ secrets.HNHOST_ACCOUNT }}
           GOST_PROXY: ${{ secrets.PROXY_URL != '' && '1' || '' }}
           TG_BOT: ${{ secrets.TG_BOT }}
-        run: bash hnhost_coins.sh
+        run: |
+          echo "🔍 检查环境变量..."
+          if [ -z "$HNHOST_ACCOUNT" ]; then
+            echo "❌ HNHOST_ACCOUNT 未设置"
+            exit 1
+          fi
+          echo "✅ HNHOST_ACCOUNT 已设置"
+          bash hnhost_coins.sh
 
       - name: 📂 移动续期脚本
         run: |
-          mv private/main.py main.py
+          if [ -f "private/main.py" ]; then
+            mv private/main.py main.py
+          fi
           if [ -f "private/HNHOST_SESSION.json" ]; then
             mv private/HNHOST_SESSION.json HNHOST_SESSION.json
           fi
@@ -55,10 +67,12 @@ jobs:
           python-version: '3.10'
 
       - name: 📦 安装依赖
+        if: ${{ hashFiles('main.py') != '' }}
         run: |
           pip install seleniumbase requests
 
       - name: 🔄 执行续期
+        if: ${{ hashFiles('main.py') != '' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -75,4 +89,5 @@ jobs:
           path: |
             *.png
             *.json
+            *.log
           retention-days: 7
