@@ -2,64 +2,97 @@ name: HNHost
 
 on:
   schedule:
-    # 每天 UTC 时间 16:00 运行（北京时间 00:00）
+    # 每天 UTC 16:00（北京时间 00:00）
     - cron: '0 16 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
+    timeout-minutes: 15
+
     steps:
+      # ========================
+      # 1. 拉取私库
+      # ========================
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/client.hnhost.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: 查看私库文件
+
+      # ========================
+      # 2. 环境检查
+      # ========================
+      - name: Debug files
         working-directory: scripts
         run: |
+          echo "=== FILE LIST ==="
           ls -la
-          echo "=== 查找 py 文件 ==="
-          ls -la *.py || echo "没有找到 py 文件"
-          echo "=== 查找配置文件 ==="
-          ls -la config.json || echo "没有找到 config.json"
-          echo "=== 查找会话文件 ==="
-          ls -la HNHOST_SESSION.json || echo "没有找到会话文件"
-      
+
+          echo "=== PY FILES ==="
+          find . -name "*.py"
+
+          echo "=== CONFIG ==="
+          cat config.json || echo "no config.json"
+
+          echo "=== SESSION ==="
+          if [ -f HNHOST_SESSION.json ]; then
+            echo "session exists"
+          else
+            echo "NO SESSION FILE"
+          fi
+
+      # ========================
+      # 3. Python
+      # ========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      # ========================
+      # 4. 系统依赖（重点修复）
+      # ========================
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
-      
+          sudo apt-get install -y xvfb fonts-liberation libnss3 libatk-bridge2.0-0 libgtk-3-0
+
+      # ========================
+      # 5. Python依赖
+      # ========================
       - name: Install Python dependencies
         working-directory: scripts
         run: |
-          pip install seleniumbase pyvirtualdisplay requests
-      
+          pip install --upgrade pip
+          pip install seleniumbase requests pyvirtualdisplay
+
+      # ========================
+      # 6. 运行脚本（修复DISPLAY问题）
+      # ========================
       - name: Run renew script
         working-directory: scripts
         env:
+          DISPLAY: :99
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "Starting Xvfb..."
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
           sleep 3
-          export DISPLAY=:99
+
+          echo "Running script..."
           python main.py
-      
-      - name: Upload debug screenshots
+
+      # ========================
+      # 7. Debug截图
+      # ========================
+      - name: Upload debug artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: debug-screenshots-${{ github.run_number }}
+          name: hnhost-debug-${{ github.run_number }}
           path: scripts/*.png
           retention-days: 7
