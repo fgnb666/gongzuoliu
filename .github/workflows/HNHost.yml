@@ -1,0 +1,78 @@
+name: HNHost
+
+on:
+  schedule:
+    - cron: '0 16 * * *'  # 每天 UTC 16:00 (北京时间 0:00)
+  workflow_dispatch:
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 📥 拉取私库脚本
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/client.hnhost.net-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: private
+
+      - name: 📂 复制签到脚本
+        run: cp private/hnhost_coins.sh hnhost_coins.sh
+
+      - name: 🛡️ 启动 GOST 代理转发
+        if: ${{ secrets.PROXY_URL != '' }}
+        env:
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          nohup ./gost -L http://:8080 -F "$PROXY_URL" > gost.log 2>&1 &
+          sleep 3
+          echo "✅ GOST 已启动，测试连通性..."
+          curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\.[0-9]*$/.**/' && echo
+
+      - name: 🪙 执行每日签到
+        env:
+          HNHOST_ACCOUNT: ${{ secrets.HNHOST_ACCOUNT }}
+          GOST_PROXY: ${{ secrets.PROXY_URL != '' && '1' || '' }}
+          TG_BOT: ${{ secrets.TG_BOT }}
+        run: bash hnhost_coins.sh
+
+      - name: 📂 移动续期脚本
+        run: |
+          mv private/main.py main.py
+          if [ -f "private/HNHOST_SESSION.json" ]; then
+            mv private/HNHOST_SESSION.json HNHOST_SESSION.json
+          fi
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 安装依赖
+        run: |
+          pip install seleniumbase requests
+
+      - name: 🔄 执行续期
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          GOST_PROXY: ${{ secrets.PROXY_URL != '' && '1' || '' }}
+        run: |
+          python main.py
+
+      - name: 📤 上传结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hnhost-results
+          path: |
+            *.png
+            *.json
+          retention-days: 7
