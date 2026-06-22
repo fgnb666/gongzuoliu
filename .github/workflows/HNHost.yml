@@ -38,7 +38,6 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROXY: "socks5://uycgh.softtrace.xyz:1444"
         run: |
           python main.py
 
