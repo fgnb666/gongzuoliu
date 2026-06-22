@@ -1,4 +1,4 @@
-name: HNHost
+name: HNHost-Coins
 
 on:
   workflow_dispatch:
