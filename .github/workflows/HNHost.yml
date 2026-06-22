@@ -2,13 +2,13 @@ name: HNHost
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # 每天 UTC 16:00（北京时间 00:00）
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     
     steps:
       - name: 📥 下载私库脚本
@@ -18,38 +18,40 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: private
 
-      - name: 📂 移动脚本到工作目录
+      - name: 📂 移动脚本
         run: |
           mv private/main.py main.py
           if [ -f "private/HNHOST_SESSION.json" ]; then
             mv private/HNHOST_SESSION.json HNHOST_SESSION.json
-            echo "✅ HNHOST_SESSION.json 已移动"
           fi
-          ls -la
 
-      - name: 设置 Python 环境
+      - name: 设置 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
-          pip install requests
+          pip install -U 'camoufox[geoip]' playwright requests
+          playwright install firefox
+          # 安装系统依赖
+          sudo apt-get update
+          sudo apt-get install -y xvfb
 
-      - name: 运行续期脚本
+      - name: 运行续期
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python main.py
+          xvfb-run -a python main.py
 
-      - name: 上传日志
+      - name: 上传日志和截图
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hnhost-logs
           path: |
-            *.log
+            *.png
             *.json
+            *.log
           retention-days: 7
