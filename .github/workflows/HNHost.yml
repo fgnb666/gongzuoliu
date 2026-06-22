@@ -32,11 +32,9 @@ jobs:
 
       - name: 安装依赖
         run: |
-          pip install -U 'camoufox[geoip]' playwright requests
-          playwright install firefox
-          # 安装系统依赖
+          pip install seleniumbase requests
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb chromium-browser
 
       - name: 运行续期
         env:
@@ -45,13 +43,12 @@ jobs:
         run: |
           xvfb-run -a python main.py
 
-      - name: 上传日志和截图
+      - name: 上传结果
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hnhost-logs
+          name: hnhost-results
           path: |
             *.png
             *.json
-            *.log
           retention-days: 7
