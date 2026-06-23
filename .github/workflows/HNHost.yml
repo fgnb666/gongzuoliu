@@ -2,8 +2,8 @@ name: HNHost
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # 每天 UTC 16:00（北京时间 00:00）
-  workflow_dispatch:  # 支持手动触发
+    - cron: '0 16 * * *'
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -33,9 +33,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
-      - name: 安装 Python 依赖
+      - name: 安装 Python 依赖（强制安装）
         run: |
-          pip install seleniumbase requests
+          python -m pip install --upgrade pip
+          pip install seleniumbase pyvirtualdisplay requests
+          # 如果 pyvirtualdisplay 安装失败，用备选方案
+          pip install pyvirtualdisplay || pip install easyprocess
+
+      - name: 验证依赖安装
+        run: |
+          python -c "import pyvirtualdisplay; print('✅ pyvirtualdisplay 已安装')"
+          python -c "import seleniumbase; print('✅ seleniumbase 已安装')"
 
       - name: 运行续期脚本
         env:
