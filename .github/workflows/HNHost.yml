@@ -1,0 +1,56 @@
+name: HNHost
+
+on:
+  schedule:
+    - cron: '0 16 * * *'  # 每天 UTC 16:00（北京时间 00:00）
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 下载私库脚本
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/client.hnhost.net-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: private
+
+      - name: 📂 移动脚本到工作目录
+        run: |
+          mv private/* .
+          ls -la
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install seleniumbase requests
+
+      - name: 运行续期脚本
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 3
+          export DISPLAY=:99
+          python main.py
+
+      - name: 上传调试截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: ./*.png
+          retention-days: 7
