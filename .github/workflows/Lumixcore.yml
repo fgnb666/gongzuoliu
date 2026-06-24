@@ -31,7 +31,7 @@ jobs:
       - name: Install Python dependencies
         working-directory: scripts
         run: |
-          pip install -q seleniumbase pyvirtualdisplay
+          pip install -q seleniumbase pyvirtualdisplay requests
           if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
       
       - name: Run renew script
@@ -43,7 +43,7 @@ jobs:
           PROXY: ${{ secrets.PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main.py
+        run: python cookie_renew.py   # 👈 改成这个文件名
       
       - name: Upload result files
         uses: actions/upload-artifact@v4
