@@ -25,21 +25,29 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb firefox
+          sudo apt-get install -y xvfb
+      
+      - name: Install Camoufox
+        run: |
+          # Camoufox 安装方式 (根据官方文档)
+          # 这里假设用 Docker 或 二进制方式
+          docker run -d --rm -p 8080:8080 --name camoufox camoufox/camoufox
       
       - name: Install Python dependencies
         working-directory: scripts
         run: |
-          pip install -q seleniumbase pyvirtualdisplay
+          pip install -q requests
           if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
+      
+      - name: Wait for Camoufox
+        run: |
+          sleep 10
+          curl -s http://localhost:8080/health || echo "Camoufox not ready"
       
       - name: Run renew script
         working-directory: scripts
         env:
           HEADLESS: 'true'
-          USERNAME: ${{ secrets.LUMIX_USERNAME }}
-          PASSWORD: ${{ secrets.LUMIX_PASSWORD }}
-          PROXY: ${{ secrets.PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
