@@ -2,8 +2,9 @@ name: Lumixcore
 
 on:
   schedule:
+    # 每天 UTC 时间 0:00 运行（北京时间 8:00）
     - cron: '0 0 * * *'
-  workflow_dispatch:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   renew:
@@ -22,21 +23,29 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb google-chrome-stable
+        
+      - name: Install Python dependencies
         working-directory: scripts
         run: |
-          pip install requests
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -q seleniumbase pyvirtualdisplay
+          if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
       
-      - name: Run renew
+      - name: Run renew script
         working-directory: scripts
         env:
-          REMEMBER_WEB: ${{ secrets.REMEMBER_WEB }}
+          HEADLESS: 'true'
+          USERNAME: ${{ secrets.LUMIX_USERNAME }}
+          PASSWORD: ${{ secrets.LUMIX_PASSWORD }}
+          PROXY: ${{ secrets.PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
       
-      - name: Upload result
+      - name: Upload result files
         uses: actions/upload-artifact@v4
         if: always()
         with:
