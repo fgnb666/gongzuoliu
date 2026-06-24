@@ -2,9 +2,8 @@ name: Lumixcore
 
 on:
   schedule:
-    # 每天 UTC 时间 0:00 运行（北京时间 8:00）
     - cron: '0 0 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -18,34 +17,49 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
+      - name: Debug - list all files
+        run: |
+          echo "=== 当前目录 ==="
+          ls -la
+          echo "=== scripts 目录 ==="
+          ls -la scripts/
+          echo "=== scripts 目录下所有文件（递归） ==="
+          find scripts/ -type f
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb google-chrome-stable
-        
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: scripts
         run: |
-          pip install -q seleniumbase pyvirtualdisplay requests
-          if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
+          pip install requests
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       
-      - name: Run renew script
+      - name: Run renew
         working-directory: scripts
         env:
-          HEADLESS: 'true'
-          USERNAME: ${{ secrets.LUMIX_USERNAME }}
-          PASSWORD: ${{ secrets.LUMIX_PASSWORD }}
-          PROXY: ${{ secrets.PROXY }}
+          REMEMBER_WEB: ${{ secrets.REMEMBER_WEB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python cookie_renew.py   # 👈 改成这个文件名
+        run: |
+          # 先看看当前目录有什么文件
+          ls -la
+          # 如果 cookie_renew.py 在根目录，用 ../cookie_renew.py
+          if [ -f "../cookie_renew.py" ]; then
+            python ../cookie_renew.py
+          elif [ -f "cookie_renew.py" ]; then
+            python cookie_renew.py
+          else
+            echo "❌ 找不到 cookie_renew.py"
+            echo "当前目录文件列表:"
+            ls -la
+            find . -name "*.py" -type f
+            exit 1
+          fi
       
-      - name: Upload result files
+      - name: Upload result
         uses: actions/upload-artifact@v4
         if: always()
         with:
