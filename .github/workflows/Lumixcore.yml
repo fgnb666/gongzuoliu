@@ -17,15 +17,6 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
-      - name: Debug - list all files
-        run: |
-          echo "=== 当前目录 ==="
-          ls -la
-          echo "=== scripts 目录 ==="
-          ls -la scripts/
-          echo "=== scripts 目录下所有文件（递归） ==="
-          find scripts/ -type f
-      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -43,21 +34,7 @@ jobs:
           REMEMBER_WEB: ${{ secrets.REMEMBER_WEB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          # 先看看当前目录有什么文件
-          ls -la
-          # 如果 cookie_renew.py 在根目录，用 ../cookie_renew.py
-          if [ -f "../cookie_renew.py" ]; then
-            python ../cookie_renew.py
-          elif [ -f "cookie_renew.py" ]; then
-            python cookie_renew.py
-          else
-            echo "❌ 找不到 cookie_renew.py"
-            echo "当前目录文件列表:"
-            ls -la
-            find . -name "*.py" -type f
-            exit 1
-          fi
+        run: python main.py
       
       - name: Upload result
         uses: actions/upload-artifact@v4
