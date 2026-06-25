@@ -1,50 +1,77 @@
-name: Lumixcore
+name: Auto Renew Sillydev Server
 
 on:
-  schedule:
-    - cron: '0 0 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: write
 
 jobs:
-  renew:
+  renew-job:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+
     steps:
+      # 拉取私库
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/panel.lumixcore.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: Setup Python
+
+      # 设置 Python 环境
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install system dependencies
+          python-version: "3.11"
+
+      # 安装 Playwright 及依赖
+      - name: Install Playwright and dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb google-chrome-stable
-        
-      - name: Install Python dependencies
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      # 安装 requests（如果需要）
+      - name: Install requests
         working-directory: scripts
         run: |
-          pip install -q seleniumbase pyvirtualdisplay
-          if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
-      
-      - name: Run renew script
+          pip install requests
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # 执行续期脚本
+      - name: Run Server Renewal Script
         working-directory: scripts
         env:
-          HEADLESS: 'true'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main.py
-      
-      - name: Upload result files
-        uses: actions/upload-artifact@v4
+          SILLYDEV_COOKIE: ${{ secrets.SILLYDEV_COOKIE }}
+          SILLYDEV_EMAIL: ${{ secrets.SILLYDEV_EMAIL }}
+          SILLYDEV_PASSWORD: ${{ secrets.SILLYDEV_PASSWORD }}
+        run: python -u main.py
+
+      # 提交更新时间文件到私库
+      - name: Commit time.txt
+        if: success()
+        working-directory: scripts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "$(date +'%Y-%m-%d %H:%M:%S')" > time.txt
+          git add time.txt
+          if git diff --cached --quiet; then
+            echo "无变化，无需提交"
+          else
+            git commit -m "⏱️ 更新时间文件: $(date +'%Y-%m-%d %H:%M:%S')"
+            git push origin HEAD:main
+          fi
+
+      # 上传调试文件（截图和日志）
+      - name: Upload debug artifacts
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: lumixcore-result
-          path: scripts/output/
-          retention-days: 7
+          name: screenshots-and-logs
+          path: scripts/*.png
