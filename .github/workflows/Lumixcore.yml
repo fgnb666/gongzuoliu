@@ -8,18 +8,18 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       # =========================
-      # 1️⃣ 拉私库
+      # 1️⃣ 拉取私库（放你的 API 脚本）
       # =========================
-      - name: Checkout private repo
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/panel.lumixcore.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: scripts
+          path: app
 
       # =========================
       # 2️⃣ Python
@@ -30,64 +30,18 @@ jobs:
           python-version: '3.11'
 
       # =========================
-      # 3️⃣ 安装依赖
+      # 3️⃣ 安装依赖（极简）
       # =========================
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install playwright seleniumbase pyvirtualdisplay requests
+          pip install requests
 
       # =========================
-      # 4️⃣ ⭐ 关键修复：安装浏览器
+      # 4️⃣ 运行 API 续期脚本
       # =========================
-      - name: Install Playwright browsers
+      - name: Run API renew
         run: |
-          playwright install
-
-      # =========================
-      # 5️⃣ 系统依赖（Xvfb）
-      # =========================
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            xvfb \
-            libnss3 \
-            libatk1.0-0 \
-            libatk-bridge2.0-0 \
-            libcups2 \
-            libxcomposite1 \
-            libxrandr2 \
-            libxdamage1 \
-            libxkbcommon0 \
-            libgbm1 \
-            libasound2t64 \
-            fonts-liberation \
-            libappindicator3-1 \
-            xdg-utils \
-            wget \
-            ca-certificates
-
-      # =========================
-      # 6️⃣ 运行脚本
-      # =========================
-      - name: Run script
+          python app/main.py
         env:
-          HEADLESS: "true"
-          KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
-          KATABUMP_PASSWORD: ${{ secrets.KATABUMP_PASSWORD }}
-        run: |
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          export DISPLAY=:99
-
-          python scripts/main.py
-
-      # =========================
-      # 7️⃣ Debug
-      # =========================
-      - name: Upload debug screenshot
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: debug-screenshot
-          path: /tmp/*.png
+          PYTHONUNBUFFERED: "1"
