@@ -8,11 +8,11 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       # =========================
-      # 1️⃣ 拉取私库（放你的 API 脚本）
+      # 1️⃣ 拉取你的脚本仓库
       # =========================
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
           path: app
 
       # =========================
-      # 2️⃣ Python
+      # 2️⃣ Python 环境
       # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,18 +30,30 @@ jobs:
           python-version: '3.11'
 
       # =========================
-      # 3️⃣ 安装依赖（极简）
+      # 3️⃣ 安装 Playwright（UI必需）
       # =========================
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install requests
+          pip install playwright
+          playwright install chromium
 
       # =========================
-      # 4️⃣ 运行 API 续期脚本
+      # 4️⃣ 运行自动续期脚本
       # =========================
-      - name: Run API renew
+      - name: Run UI renew script
         run: |
           python app/main.py
         env:
           PYTHONUNBUFFERED: "1"
+
+      # =========================
+      # 5️⃣ Debug截图（失败时保留）
+      # =========================
+      - name: Upload debug screenshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lumixcore-debug
+          path: /tmp/*.png
+          retention-days: 7
