@@ -12,7 +12,7 @@ jobs:
 
     steps:
       # =========================
-      # 1️⃣ 拉取私库
+      # 1️⃣ 拉私库
       # =========================
       - name: Checkout private repo
         uses: actions/checkout@v4
@@ -30,7 +30,22 @@ jobs:
           python-version: '3.11'
 
       # =========================
-      # 3️⃣ 系统依赖（已修 Ubuntu 24.04）
+      # 3️⃣ 安装依赖
+      # =========================
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install playwright seleniumbase pyvirtualdisplay requests
+
+      # =========================
+      # 4️⃣ ⭐ 关键修复：安装浏览器
+      # =========================
+      - name: Install Playwright browsers
+        run: |
+          playwright install
+
+      # =========================
+      # 5️⃣ 系统依赖（Xvfb）
       # =========================
       - name: Install system dependencies
         run: |
@@ -54,26 +69,13 @@ jobs:
             ca-certificates
 
       # =========================
-      # 4️⃣ Python依赖
-      # =========================
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install seleniumbase pyvirtualdisplay requests
-          if [ -f "scripts/requirements.txt" ]; then
-            pip install -r scripts/requirements.txt
-          fi
-
-      # =========================
-      # 5️⃣ 运行脚本
+      # 6️⃣ 运行脚本
       # =========================
       - name: Run script
         env:
           HEADLESS: "true"
           KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
           KATABUMP_PASSWORD: ${{ secrets.KATABUMP_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
           export DISPLAY=:99
@@ -81,7 +83,7 @@ jobs:
           python scripts/main.py
 
       # =========================
-      # 6️⃣ Debug截图
+      # 7️⃣ Debug
       # =========================
       - name: Upload debug screenshot
         uses: actions/upload-artifact@v4
@@ -89,4 +91,3 @@ jobs:
         with:
           name: debug-screenshot
           path: /tmp/*.png
-          retention-days: 7
