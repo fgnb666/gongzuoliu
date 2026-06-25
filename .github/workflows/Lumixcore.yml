@@ -1,59 +1,50 @@
-name: Lumixcore Auto Renew
+name: Lumixcore
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    
     steps:
-      # =========================
-      # 1️⃣ 拉取私库
-      # =========================
-      - name: Checkout repo
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/panel.lumixcore.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: app
-
-      # =========================
-      # 2️⃣ Python 环境
-      # =========================
+          path: scripts
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      # =========================
-      # 3️⃣ 安装 Playwright
-      # =========================
-      - name: Install dependencies
+      
+      - name: Install system dependencies
         run: |
-          pip install --upgrade pip
-          pip install playwright
-          playwright install chromium
-
-      # =========================
-      # 4️⃣ 运行续期脚本
-      # =========================
+          sudo apt-get update
+          sudo apt-get install -y xvfb google-chrome-stable
+        
+      - name: Install Python dependencies
+        working-directory: scripts
+        run: |
+          pip install -q seleniumbase pyvirtualdisplay
+          if [ -f requirements.txt ]; then pip install -r requirements.txt -q; fi
+      
       - name: Run renew script
-        run: |
-          python app/main.py
+        working-directory: scripts
         env:
-          PYTHONUNBUFFERED: "1"
-
-      # =========================
-      # 5️⃣ 上传截图调试
-      # =========================
-      - name: Upload debug screenshot
+          HEADLESS: 'true'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+      
+      - name: Upload result files
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lumixcore-debug
-          path: /tmp/*.png
+          name: lumixcore-result
+          path: scripts/output/
           retention-days: 7
