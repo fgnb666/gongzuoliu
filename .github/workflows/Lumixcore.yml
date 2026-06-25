@@ -12,7 +12,7 @@ jobs:
 
     steps:
       # =========================
-      # 1️⃣ 拉取你的脚本仓库
+      # 1️⃣ 拉取私库
       # =========================
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
           python-version: '3.11'
 
       # =========================
-      # 3️⃣ 安装 Playwright（UI必需）
+      # 3️⃣ 安装 Playwright
       # =========================
       - name: Install dependencies
         run: |
@@ -39,16 +39,18 @@ jobs:
           playwright install chromium
 
       # =========================
-      # 4️⃣ 运行自动续期脚本
+      # 4️⃣ 运行脚本（账号密码登录）
       # =========================
-      - name: Run UI renew script
+      - name: Run renew script
         run: |
           python app/main.py
         env:
           PYTHONUNBUFFERED: "1"
+          LUMIX_EMAIL: ${{ secrets.LUMIX_EMAIL }}
+          LUMIX_PASSWORD: ${{ secrets.LUMIX_PASSWORD }}
 
       # =========================
-      # 5️⃣ Debug截图（失败时保留）
+      # 5️⃣ 截图调试（失败保留）
       # =========================
       - name: Upload debug screenshot
         uses: actions/upload-artifact@v4
