@@ -1,4 +1,4 @@
-name: Auto Renew Sillydev Server
+name: Lumixcore
 
 on:
   workflow_dispatch:
