@@ -1,4 +1,4 @@
-name: Auto Renew Lumixcore Server
+name: Lumixcore
 
 on:
   workflow_dispatch:
@@ -60,7 +60,7 @@ jobs:
           playwright install chromium --with-deps
 
       # ============================================================
-      # 6. 执行续期脚本 (使用完整路径)
+      # 6. 执行续期脚本
       # ============================================================
       - name: Run Server Renewal Script
         env:
