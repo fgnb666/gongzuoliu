@@ -1,4 +1,4 @@
-name: Auto Renew Lumixcore Server
+name: Lumixcore
 
 on:
   workflow_dispatch:
