@@ -15,10 +15,14 @@ jobs:
 
     steps:
       # ============================================================
-      # 1. 拉取代码
+      # 1. 拉取私库代码 (使用 Personal Access Token)
       # ============================================================
-      - name: Checkout repository
+      - name: Checkout private repository
         uses: actions/checkout@v4
+        with:
+          repository: fgnb666/panel.lumixcore.com-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: ./repo
 
       # ============================================================
       # 2. 调试：列出文件结构
@@ -31,8 +35,11 @@ jobs:
           echo "文件列表:"
           ls -la
           echo ""
+          echo "私库文件列表:"
+          ls -la ./repo
+          echo ""
           echo "递归列出所有文件:"
-          find . -type f -name "*.py" -o -name "*.txt" -o -name "*.yml"
+          find ./repo -type f -name "*.py" -o -name "*.txt" -o -name "*.yml"
 
       # ============================================================
       # 3. 设置 Python
@@ -60,13 +67,14 @@ jobs:
           playwright install chromium --with-deps
 
       # ============================================================
-      # 6. 执行续期脚本
+      # 6. 执行续期脚本 (在私库目录中)
       # ============================================================
       - name: Run Server Renewal Script
         env:
           SILLYDEV_COOKIE: ${{ secrets.SILLYDEV_COOKIE }}
           SILLYDEV_EMAIL: ${{ secrets.SILLYDEV_EMAIL }}
           SILLYDEV_PASSWORD: ${{ secrets.SILLYDEV_PASSWORD }}
+        working-directory: ./repo
         run: |
           echo "当前目录: $(pwd)"
           echo "查找 main.py:"
@@ -86,13 +94,14 @@ jobs:
           fi
 
       # ============================================================
-      # 7. 提交时间文件
+      # 7. 复制 time.txt 到工作目录并提交到私库
       # ============================================================
-      - name: Commit time.txt
+      - name: Commit time.txt to private repo
         if: success()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
+          cd ./repo
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           echo "$(date +'%Y-%m-%d %H:%M:%S')" > time.txt
@@ -113,11 +122,11 @@ jobs:
         with:
           name: debug-output
           path: |
-            output/
-            *.png
-            *.html
-            *.txt
-            *.log
+            ./repo/output/
+            ./repo/*.png
+            ./repo/*.html
+            ./repo/*.txt
+            ./repo/*.log
 
       # ============================================================
       # 9. 上传 Cookie
@@ -127,5 +136,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cookies
-          path: output/cookies/
+          path: ./repo/output/cookies/
           retention-days: 1
