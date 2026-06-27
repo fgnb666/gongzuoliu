@@ -14,9 +14,6 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # ============================================================
-      # 1. 拉取私库代码 (使用 Personal Access Token)
-      # ============================================================
       - name: Checkout private repository
         uses: actions/checkout@v4
         with:
@@ -24,84 +21,36 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: ./repo
 
-      # ============================================================
-      # 2. 调试：列出文件结构
-      # ============================================================
-      - name: List files
-        run: |
-          echo "当前目录:"
-          pwd
-          echo ""
-          echo "文件列表:"
-          ls -la
-          echo ""
-          echo "私库文件列表:"
-          ls -la ./repo
-          echo ""
-          echo "递归列出所有文件:"
-          find ./repo -type f -name "*.py" -o -name "*.txt" -o -name "*.yml"
-
-      # ============================================================
-      # 3. 设置 Python
-      # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ============================================================
-      # 4. 安装系统依赖
-      # ============================================================
-      - name: Install system dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-
-      # ============================================================
-      # 5. 安装 Python 依赖
-      # ============================================================
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install playwright seleniumbase pyvirtualdisplay requests
+          pip install playwright seleniumbase pyvirtualdisplay
           playwright install chromium --with-deps
 
-      # ============================================================
-      # 6. 执行续期脚本 (在私库目录中)
-      # ============================================================
-      - name: Run Server Renewal Script
-        env:
-          SILLYDEV_COOKIE: ${{ secrets.SILLYDEV_COOKIE }}
-          SILLYDEV_EMAIL: ${{ secrets.SILLYDEV_EMAIL }}
-          SILLYDEV_PASSWORD: ${{ secrets.SILLYDEV_PASSWORD }}
+      - name: Run renewal script
         working-directory: ./repo
+        env:
+          # ⭐ 代理配置 (从 Secrets 读取)
+          PROXY_SERVER: ${{ secrets.PROXY_SERVER }}
+          PROXY_USERNAME: ${{ secrets.PROXY_USERNAME }}
+          PROXY_PASSWORD: ${{ secrets.PROXY_PASSWORD }}
         run: |
-          echo "当前目录: $(pwd)"
-          echo "查找 main.py:"
-          find . -name "main.py"
-          echo ""
-          if [ -f "main.py" ]; then
-            python -u main.py
-          elif [ -f "src/main.py" ]; then
-            python -u src/main.py
-          elif [ -f "scripts/main.py" ]; then
-            python -u scripts/main.py
-          else
-            echo "❌ 找不到 main.py 文件!"
-            echo "当前文件列表:"
-            ls -la
-            exit 1
-          fi
+          Xvfb :99 -screen 0 1920x1080x24 &
+          export DISPLAY=:99
+          python -u main.py
 
-      # ============================================================
-      # 7. 复制 time.txt 到工作目录并提交到私库
-      # ============================================================
-      - name: Commit time.txt to private repo
+      - name: Commit time.txt
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        working-directory: ./repo
         run: |
-          cd ./repo
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           echo "$(date +'%Y-%m-%d %H:%M:%S')" > time.txt
@@ -112,29 +61,3 @@ jobs:
             git commit -m "⏱️ 更新时间文件: $(date +'%Y-%m-%d %H:%M:%S')"
             git push origin HEAD:main
           fi
-
-      # ============================================================
-      # 8. 上传调试文件
-      # ============================================================
-      - name: Upload debug artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-output
-          path: |
-            ./repo/output/
-            ./repo/*.png
-            ./repo/*.html
-            ./repo/*.txt
-            ./repo/*.log
-
-      # ============================================================
-      # 9. 上传 Cookie
-      # ============================================================
-      - name: Upload cookie artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cookies
-          path: ./repo/output/cookies/
-          retention-days: 1
