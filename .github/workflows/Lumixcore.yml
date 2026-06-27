@@ -1,9 +1,9 @@
-name: Lumixcore
+name: Auto Renew Lumixcore Server
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 18 * * *"  # 每天 UTC 18:00 (北京时间 凌晨 2:00)
+    - cron: "0 18 * * *"
 
 permissions:
   contents: write
@@ -14,38 +14,80 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # 拉取代码仓库
+      # ============================================================
+      # 1. 拉取代码
+      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 设置 Python 环境
+      # ============================================================
+      # 2. 调试：列出文件结构
+      # ============================================================
+      - name: List files
+        run: |
+          echo "当前目录:"
+          pwd
+          echo ""
+          echo "文件列表:"
+          ls -la
+          echo ""
+          echo "递归列出所有文件:"
+          find . -type f -name "*.py" -o -name "*.txt" -o -name "*.yml"
+
+      # ============================================================
+      # 3. 设置 Python
+      # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 安装系统依赖 (Xvfb)
+      # ============================================================
+      # 4. 安装系统依赖
+      # ============================================================
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
 
-      # 安装 Python 依赖
+      # ============================================================
+      # 5. 安装 Python 依赖
+      # ============================================================
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install playwright seleniumbase pyvirtualdisplay requests
           playwright install chromium --with-deps
 
-      # 执行续期脚本
+      # ============================================================
+      # 6. 执行续期脚本 (使用完整路径)
+      # ============================================================
       - name: Run Server Renewal Script
         env:
           SILLYDEV_COOKIE: ${{ secrets.SILLYDEV_COOKIE }}
           SILLYDEV_EMAIL: ${{ secrets.SILLYDEV_EMAIL }}
           SILLYDEV_PASSWORD: ${{ secrets.SILLYDEV_PASSWORD }}
-        run: python -u main.py
+        run: |
+          echo "当前目录: $(pwd)"
+          echo "查找 main.py:"
+          find . -name "main.py"
+          echo ""
+          if [ -f "main.py" ]; then
+            python -u main.py
+          elif [ -f "src/main.py" ]; then
+            python -u src/main.py
+          elif [ -f "scripts/main.py" ]; then
+            python -u scripts/main.py
+          else
+            echo "❌ 找不到 main.py 文件!"
+            echo "当前文件列表:"
+            ls -la
+            exit 1
+          fi
 
-      # 提交更新时间文件
+      # ============================================================
+      # 7. 提交时间文件
+      # ============================================================
       - name: Commit time.txt
         if: success()
         env:
@@ -62,7 +104,9 @@ jobs:
             git push origin HEAD:main
           fi
 
-      # 上传调试文件（截图和日志）
+      # ============================================================
+      # 8. 上传调试文件
+      # ============================================================
       - name: Upload debug artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -73,8 +117,11 @@ jobs:
             *.png
             *.html
             *.txt
+            *.log
 
-      # 上传 Cookie 文件（仅成功时）
+      # ============================================================
+      # 9. 上传 Cookie
+      # ============================================================
       - name: Upload cookie artifacts
         if: success()
         uses: actions/upload-artifact@v4
