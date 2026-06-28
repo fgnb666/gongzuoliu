@@ -1,4 +1,4 @@
-name: ACLClouds Auto Renew
+name: ACLClouds
 
 on:
   # 定时触发 - 每天 8:00, 14:00, 20:00 (UTC+8)
