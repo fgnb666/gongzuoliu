@@ -1,0 +1,66 @@
+name: ACL Clouds Cookie测试
+
+on:
+  workflow_dispatch:
+    inputs:
+      cookie_value:
+        description: 'Cookie值（加密token）'
+        required: true
+        type: string
+      cookie_name:
+        description: 'Cookie名称'
+        required: false
+        default: 'remember_web'
+        type: string
+  schedule:
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  cookie-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/dash.aclclouds.com-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: ./repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Run cookie test
+        env:
+          COOKIE_VALUE: ${{ github.event.inputs.cookie_value || secrets.COOKIE_VALUE }}
+          COOKIE_NAME: ${{ github.event.inputs.cookie_name || 'remember_web' }}
+        working-directory: ./repo
+        run: python -u cookie_test.py
+
+      - name: Commit time.txt
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        working-directory: ./repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "$(date +'%Y-%m-%d %H:%M:%S') - Cookie测试通过" > time.txt
+          git add time.txt
+          if git diff --cached --quiet; then
+            echo "无变化，无需提交"
+          else
+            git commit -m "⏱️ Cookie测试通过: $(date +'%Y-%m-%d %H:%M:%S')"
+            git push origin HEAD:main
+          fi
