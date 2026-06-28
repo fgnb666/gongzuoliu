@@ -1,4 +1,4 @@
-name: ACLClouds
+name: ACLClouds Auto Renew
 
 on:
   # 定时触发 - 每天 8:00, 14:00, 20:00 (UTC+8)
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       debug:
-        description: 'Debug mode'
+        description: 'Debug mode (headless=false)'
         required: false
         default: 'false'
         type: choice
@@ -35,9 +35,22 @@ jobs:
           repository: fgnb666/dash.aclclouds.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           ref: main
+          # 如果私库在同一个组织，也可以用：
+          # token: ${{ secrets.GITHUB_TOKEN }}
       
       # =========================================================
-      # 2. 设置 Python
+      # 2. 显示当前目录结构（调试用）
+      # =========================================================
+      - name: List files
+        run: |
+          echo "📁 Current directory:"
+          ls -la
+          echo ""
+          echo "📁 Script directory:"
+          ls -la ./ 2>/dev/null || echo "No files found"
+      
+      # =========================================================
+      # 3. 设置 Python
       # =========================================================
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -45,7 +58,7 @@ jobs:
           python-version: '3.11'
       
       # =========================================================
-      # 3. 安装依赖
+      # 4. 安装依赖
       # =========================================================
       - name: Install dependencies
         run: |
@@ -54,16 +67,17 @@ jobs:
           playwright install-deps
       
       # =========================================================
-      # 4. 创建 Session 文件
+      # 5. 创建 Session 文件（从 Secrets）
       # =========================================================
       - name: Create session file
         if: secrets.SESSION_JSON != ''
         run: |
           echo '${{ secrets.SESSION_JSON }}' > ${{ env.SESSION_FILE }}
           echo "✅ Session file created"
+          ls -la ${{ env.SESSION_FILE }}
       
       # =========================================================
-      # 5. 运行脚本
+      # 6. 运行脚本
       # =========================================================
       - name: Run renew script
         id: run_script
@@ -76,7 +90,7 @@ jobs:
           fi
       
       # =========================================================
-      # 6. 上传调试文件
+      # 7. 上传调试文件
       # =========================================================
       - name: Upload debug artifacts
         if: always()
@@ -87,10 +101,12 @@ jobs:
             debug_*.png
             *.log
             aclclouds_session.json
+            main.py
+            requirements.txt
           retention-days: 3
       
       # =========================================================
-      # 7. 检查结果
+      # 8. 检查结果并发送通知
       # =========================================================
       - name: Check result
         if: steps.run_script.outcome == 'failure'
