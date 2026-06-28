@@ -26,15 +26,21 @@ jobs:
         run: |
           cd ./script
           pip install -r requirements.txt
-          playwright install chromium
-          playwright install-deps
-          # SeleniumBase 依赖
-          sudo apt-get update
-          sudo apt-get install -y xvfb
+      
+      - name: Install Playwright browsers
+        run: |
+          cd ./script
+          # 方式1: 使用官方命令（推荐）
+          playwright install chromium --with-deps
+          # 方式2: 如果上面失败，手动安装依赖
+          # playwright install-deps
       
       - name: Run renewal script
         run: |
           cd ./script
+          # 设置虚拟显示（无头浏览器需要）
+          export DISPLAY=:99
+          sudo Xvfb :99 -screen 0 1920x1080x24 &
           python main.py
       
       - name: Upload logs
