@@ -27,6 +27,11 @@ jobs:
           playwright install chromium
           playwright install-deps
       
+      - name: Create session file
+        if: secrets.SESSION_JSON != ''
+        run: |
+          echo '${{ secrets.SESSION_JSON }}' > aclclouds_session.json
+      
       - name: Run renew script
         env:
           HEADLESS: 'true'
@@ -42,4 +47,5 @@ jobs:
           path: |
             debug_*.png
             *.log
+            aclclouds_session.json
           retention-days: 7
