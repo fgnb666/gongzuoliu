@@ -1,4 +1,4 @@
-name: ACL Clouds Cookie测试
+name: aclclouds
 
 on:
   workflow_dispatch:
