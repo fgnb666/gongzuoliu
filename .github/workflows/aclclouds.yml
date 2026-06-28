@@ -36,15 +36,10 @@ jobs:
         run: |
           echo "📁 私库文件列表:"
           ls -la
-          if [ -f "aclclouds_session.json" ]; then
-            echo "✅ aclclouds_session.json 存在"
-          else
-            echo "❌ aclclouds_session.json 不存在"
-          fi
 
       - name: Run cookie test
         working-directory: ./repo
-        run: python cookie_test.py
+        run: python main.py
 
       - name: Commit time.txt
         if: success()
