@@ -1,4 +1,4 @@
-name: Lumixcore Auto Renewal
+name: lumixcore
 
 on:
   # 手动触发
@@ -6,9 +6,6 @@ on:
   # 定时触发（每天凌晨2点执行）
   schedule:
     - cron: '0 2 * * *'
-  # 也可以监听私库推送（需要配置）
-  # push:
-  #   branches: [ main ]
 
 jobs:
   renew:
@@ -51,10 +48,8 @@ jobs:
           cd ./script
           python renew.py
         env:
-          # 通过环境变量传入 Cookie 值（在 GitHub Secrets 中配置）
           COOKIE_VALUE: ${{ secrets.COOKIE_VALUE }}
           COOKIE_NAME: ${{ secrets.COOKIE_NAME }}
-          # 如果使用账号密码登录
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
       
