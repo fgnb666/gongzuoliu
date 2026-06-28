@@ -2,16 +2,6 @@ name: aclclouds
 
 on:
   workflow_dispatch:
-    inputs:
-      cookie_value:
-        description: 'Cookie值（加密token）'
-        required: true
-        type: string
-      cookie_name:
-        description: 'Cookie名称'
-        required: false
-        default: 'remember_web'
-        type: string
   schedule:
     - cron: "0 18 * * *"
 
@@ -41,12 +31,20 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: Run cookie test
-        env:
-          COOKIE_VALUE: ${{ github.event.inputs.cookie_value || secrets.COOKIE_VALUE }}
-          COOKIE_NAME: ${{ github.event.inputs.cookie_name || 'remember_web' }}
+      - name: List repo files
         working-directory: ./repo
-        run: python -u cookie_test.py
+        run: |
+          echo "📁 私库文件列表:"
+          ls -la
+          if [ -f "aclclouds_session.json" ]; then
+            echo "✅ aclclouds_session.json 存在"
+          else
+            echo "❌ aclclouds_session.json 不存在"
+          fi
+
+      - name: Run cookie test
+        working-directory: ./repo
+        run: python cookie_test.py
 
       - name: Commit time.txt
         if: success()
@@ -56,11 +54,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "$(date +'%Y-%m-%d %H:%M:%S') - Cookie测试通过" > time.txt
+          echo "$(date +'%Y-%m-%d %H:%M:%S') - Cookie登录成功" > time.txt
           git add time.txt
           if git diff --cached --quiet; then
             echo "无变化，无需提交"
           else
-            git commit -m "⏱️ Cookie测试通过: $(date +'%Y-%m-%d %H:%M:%S')"
+            git commit -m "⏱️ Cookie登录成功: $(date +'%Y-%m-%d %H:%M:%S')"
             git push origin HEAD:main
           fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            ./repo/*.png
+            ./repo/time.txt
+          retention-days: 30
