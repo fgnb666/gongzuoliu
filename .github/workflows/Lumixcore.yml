@@ -1,53 +1,71 @@
-name: Lumixcore
+name: Lumixcore Auto Renewal
 
 on:
+  # 手动触发
   workflow_dispatch:
+  # 定时触发（每天凌晨2点执行）
   schedule:
-    - cron: "0 18 * * *"
-
-permissions:
-  contents: write
+    - cron: '0 2 * * *'
+  # 也可以监听私库推送（需要配置）
+  # push:
+  #   branches: [ main ]
 
 jobs:
-  renew-job:
+  renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-
+    
     steps:
-      - name: Checkout private repository
+      # ============================================
+      # 1. 拉取私库脚本（使用 Personal Access Token）
+      # ============================================
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/panel.lumixcore.com-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: ./repo
-
-      - name: Set up Python
+          path: ./script
+      
+      # ============================================
+      # 2. 设置 Python 环境
+      # ============================================
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
+          python-version: '3.10'
+      
+      # ============================================
+      # 3. 安装依赖
+      # ============================================
       - name: Install dependencies
         run: |
-          pip install playwright
-          playwright install chromium --with-deps
-
+          cd ./script
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps
+      
+      # ============================================
+      # 4. 执行续期脚本（通过 GitHub Secrets 传入敏感信息）
+      # ============================================
       - name: Run renewal script
-        working-directory: ./repo
-        run: python -u main.py
-
-      - name: Commit time.txt
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        working-directory: ./repo
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "$(date +'%Y-%m-%d %H:%M:%S')" > time.txt
-          git add time.txt
-          if git diff --cached --quiet; then
-            echo "无变化，无需提交"
-          else
-            git commit -m "⏱️ 更新时间文件: $(date +'%Y-%m-%d %H:%M:%S')"
-            git push origin HEAD:main
-          fi
+          cd ./script
+          python renew.py
+        env:
+          # 通过环境变量传入 Cookie 值（在 GitHub Secrets 中配置）
+          COOKIE_VALUE: ${{ secrets.COOKIE_VALUE }}
+          COOKIE_NAME: ${{ secrets.COOKIE_NAME }}
+          # 如果使用账号密码登录
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+      
+      # ============================================
+      # 5. 保存日志（可选）
+      # ============================================
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renewal-logs
+          path: |
+            ./script/*.log
+            ./script/*.png
