@@ -2,16 +2,14 @@ name: aclclouds
 
 on:
   schedule:
-    # 每天 UTC 时间 0:00, 6:00, 12:00 运行（北京时间 8:00, 14:00, 20:00）
     - cron: '0 0,6,12 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
     
     steps:
-      # 1. 从私库拉取代码
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
@@ -19,27 +17,16 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
-      # 2. 调试：查看拉取的文件
       - name: Debug - List files
         run: |
-          echo "📁 Current directory: $(pwd)"
-          echo ""
           echo "📁 scripts directory:"
           ls -la scripts/
-          echo ""
-          echo "📁 Check main.py:"
-          ls -la scripts/main.py || echo "❌ main.py NOT FOUND!"
-          echo ""
-          echo "📁 Check requirements.txt:"
-          ls -la scripts/requirements.txt || echo "❌ requirements.txt NOT FOUND!"
       
-      # 3. 设置 Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      # 4. 安装依赖
       - name: Install dependencies
         working-directory: scripts
         run: |
@@ -47,15 +34,12 @@ jobs:
           playwright install chromium
           playwright install-deps
       
-      # 5. 创建 Session 文件
       - name: Create session file
         working-directory: scripts
         if: secrets.SESSION_JSON != ''
         run: |
           echo '${{ secrets.SESSION_JSON }}' > aclclouds_session.json
-          echo "✅ Session file created"
       
-      # 6. 运行脚本
       - name: Run renew script
         working-directory: scripts
         env:
@@ -64,7 +48,6 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
       
-      # 7. 上传调试文件
       - name: Upload debug files
         uses: actions/upload-artifact@v4
         if: always()
