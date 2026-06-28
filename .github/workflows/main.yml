@@ -1,0 +1,129 @@
+name: ACLClouds
+
+on:
+  # 定时触发 - 每天 8:00, 14:00, 20:00 (UTC+8)
+  schedule:
+    - cron: '0 0,6,12 * * *'
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Debug mode (headless=false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    # 环境变量
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SESSION_FILE: aclclouds_session.json
+      PYTHONUNBUFFERED: 1
+    
+    steps:
+      # =========================================================
+      # 1. 从私库拉取代码
+      # =========================================================
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/dash.aclclouds.com-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: main
+      
+      # =========================================================
+      # 2. 显示目录结构（调试用）
+      # =========================================================
+      - name: List files
+        run: |
+          echo "📁 Current directory: $(pwd)"
+          echo ""
+          echo "📁 Files:"
+          ls -la
+          echo ""
+          echo "📁 Python files:"
+          ls -la *.py 2>/dev/null || echo "No Python files found"
+      
+      # =========================================================
+      # 3. 设置 Python
+      # =========================================================
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      # =========================================================
+      # 4. 安装依赖
+      # =========================================================
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps
+      
+      # =========================================================
+      # 5. 创建 Session 文件
+      # =========================================================
+      - name: Create session file
+        if: secrets.SESSION_JSON != ''
+        run: |
+          echo '${{ secrets.SESSION_JSON }}' > ${{ env.SESSION_FILE }}
+          echo "✅ Session file created"
+          echo "📁 Session file size: $(wc -c < ${{ env.SESSION_FILE }}) bytes"
+      
+      # =========================================================
+      # 6. 运行脚本
+      # =========================================================
+      - name: Run renew script
+        id: run_script
+        continue-on-error: true
+        run: |
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then
+            echo "🔧 Debug mode enabled"
+            python main.py --debug
+          else
+            python main.py
+          fi
+        env:
+          # GitHub Actions 环境无头模式
+          HEADLESS: 'true'
+      
+      # =========================================================
+      # 7. 上传调试文件
+      # =========================================================
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files-${{ github.run_id }}
+          path: |
+            debug_*.png
+            *.log
+            aclclouds_session.json
+          retention-days: 3
+      
+      # =========================================================
+      # 8. 检查结果
+      # =========================================================
+      - name: Check result
+        if: steps.run_script.outcome == 'failure'
+        run: |
+          echo "❌ Script failed!"
+          echo "Please check the logs above for details."
+          exit 1
+      
+      # =========================================================
+      # 9. 成功通知（可选）
+      # =========================================================
+      - name: Success notification
+        if: steps.run_script.outcome == 'success'
+        run: |
+          echo "✅ Script completed successfully!"
