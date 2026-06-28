@@ -28,26 +28,14 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium
           playwright install-deps
+          # SeleniumBase 依赖
+          sudo apt-get update
+          sudo apt-get install -y xvfb
       
       - name: Run renewal script
         run: |
           cd ./script
           python main.py
-        env:
-          COOKIE_VALUE: ${{ secrets.COOKIE_VALUE }}
-          COOKIE_NAME: ${{ secrets.COOKIE_NAME }}
-          USERNAME: ${{ secrets.USERNAME }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-      
-      - name: Commit and push time.txt
-        if: always()
-        run: |
-          cd ./script
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add time.txt
-          git commit -m "🔄 更新续期时间: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push
       
       - name: Upload logs
         if: always()
@@ -55,5 +43,6 @@ jobs:
         with:
           name: renewal-logs
           path: |
-            ./script/*.log
+            ./script/logs/
+            ./script/output/
             ./script/*.png
