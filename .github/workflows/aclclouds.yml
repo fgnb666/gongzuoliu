@@ -1,0 +1,68 @@
+name: aclclouds
+
+on:
+  schedule:
+    - cron: '0 0,6,12 * * *'
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/dash.aclclouds.com-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+      
+      # 🆕 调试：查看拉取的文件
+      - name: Debug - List files
+        run: |
+          echo "📁 scripts directory:"
+          ls -la scripts/
+          echo ""
+          echo "📁 Check if main.py exists:"
+          ls -la scripts/main.py || echo "❌ main.py NOT FOUND!"
+          echo ""
+          echo "📁 Check if requirements.txt exists:"
+          ls -la scripts/requirements.txt || echo "❌ requirements.txt NOT FOUND!"
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: scripts
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps
+      
+      - name: Create session file
+        working-directory: scripts
+        if: secrets.SESSION_JSON != ''
+        run: |
+          echo '${{ secrets.SESSION_JSON }}' > aclclouds_session.json
+          echo "✅ Session file created"
+      
+      - name: Run renew script
+        working-directory: scripts
+        env:
+          HEADLESS: 'true'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+      
+      - name: Upload debug files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-files
+          path: |
+            scripts/debug_*.png
+            scripts/*.log
+            scripts/aclclouds_session.json
+          retention-days: 7
