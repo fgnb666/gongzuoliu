@@ -8,35 +8,43 @@ on:
 jobs:
   renew:
     runs-on: ubuntu-latest
+
     steps:
-      # 1. 先拉取私库（用 SSH Key 或 Personal Access Token）
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: fgnb666/dash.slimenodes.com-xuqi  # 你的私库
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}      # 需要配置 Personal Access Token
-          path: ./slimenodes                            # 存放到这个目录
+          repository: fgnb666/dash.slimenodes.com-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: ./slimenodes
 
-      # 2. 安装依赖
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Playwright
+      - name: Cache Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright
+          restore-keys: |
+            ${{ runner.os }}-playwright
+
+      - name: Install dependencies
         run: |
-          pip install playwright
+          pip install playwright requests
           playwright install chromium
           playwright install-deps
 
-      # 3. 运行脚本
       - name: Run renew
         run: |
           cd ./slimenodes
           python main.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      # 4. 提交更新后的 Cookie 回私库
-      - name: Push updated session
+      - name: Commit updated session
         run: |
           cd ./slimenodes
           git config user.email "action@github.com"
