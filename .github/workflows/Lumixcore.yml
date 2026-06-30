@@ -28,11 +28,9 @@ jobs:
           pip install -r requirements.txt
       
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
+        run: sudo apt-get install -y xvfb
       
-      - name: Run renewal script
+      - name: Run renewal
         run: |
           cd ./script
           export DISPLAY=:99
@@ -47,4 +45,3 @@ jobs:
           path: |
             ./script/logs/
             ./script/output/
-            ./script/*.png
