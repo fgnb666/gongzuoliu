@@ -26,14 +26,13 @@ jobs:
         run: |
           cd ./script
           pip install -r requirements.txt
-          playwright install chromium
       
-      - name: Install system deps
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxtst6 libnss3 libgbm1 libasound2
       
-      - name: Run renewal
+      - name: Run renewal script
         run: |
           cd ./script
           export DISPLAY=:99
@@ -48,3 +47,4 @@ jobs:
           path: |
             ./script/logs/
             ./script/output/
+            ./script/*.png
