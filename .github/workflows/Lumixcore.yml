@@ -27,16 +27,30 @@ jobs:
           cd ./script
           pip install -r requirements.txt
       
-      - name: Install system dependencies
+      - name: Install system dependencies (SeleniumBase)
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxtst6 libnss3 libgbm1 libasound2
+          sudo apt-get install -y \
+            xvfb \
+            libxi6 \
+            libgconf-2-4 \
+            libnss3 \
+            libxss1 \
+            libxcb1 \
+            libxcb-shm0 \
+            libxcb-xfixes0 \
+            libxcb-shape0 \
+            libxcb-randr0 \
+            libxcomposite1 \
+            libasound2t64 \
+            libatk-bridge2.0-0 \
+            libgtk-3-0
       
       - name: Run renewal script
         run: |
           cd ./script
           export DISPLAY=:99
-          sudo Xvfb :99 -screen 0 1920x1080x24 &
+          Xvfb :99 -screen 0 1920x1080x24 &
           python main.py
       
       - name: Upload logs
