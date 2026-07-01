@@ -22,21 +22,9 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: Install dependencies
-        run: |
-          cd ./script
-          pip install -r requirements.txt
-      
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      
       - name: Run renewal
         run: |
           cd ./script
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1920x1080x24 &
           python main.py
       
       - name: Upload logs
