@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: '3.10'
       
+      - name: Install dependencies
+        run: |
+          cd ./script
+          pip install -r requirements.txt
+      
       - name: Run renewal
         run: |
           cd ./script
