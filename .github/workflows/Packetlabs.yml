@@ -1,4 +1,4 @@
-name: Packetlabs
+name: Packetlabs 自动续期
 
 on:
   schedule:
@@ -265,4 +265,3 @@ jobs:
           delete_workflow_pattern: ${{ github.workflow }}
           retain_days: 0
           keep_minimum_runs: 6
-
