@@ -1,4 +1,4 @@
-name: Packetlabs 自动续期
+name: Packetlabs
 
 on:
   schedule:
