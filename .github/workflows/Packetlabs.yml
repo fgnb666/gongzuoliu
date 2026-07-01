@@ -1,4 +1,4 @@
-name: Packetlabs
+name: Packetlabs 自动续期
 
 on:
   schedule:
@@ -44,7 +44,7 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           SESSION_ID: ${{ secrets.SESSION_ID }}
           TG_BOT: ${{ secrets.TG_BOT }}
-        run: bash scripts/packetlabs/packetlabs.sh
+        run: bash packetlabs.sh
 
       - name: 清理运行记录
         if: always()
