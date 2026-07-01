@@ -26,6 +26,7 @@ jobs:
         run: |
           cd ./script
           pip install -r requirements.txt
+          playwright install chromium
       
       - name: Run renewal
         run: |
