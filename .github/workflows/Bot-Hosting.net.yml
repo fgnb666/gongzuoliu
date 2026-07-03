@@ -48,7 +48,7 @@ jobs:
           pip install camoufox -q
       
       # ============================================================
-      # Step 5: 使用私库的 Cookie 文件（无需手动创建）
+      # Step 5: 检查 Cookie 文件
       # ============================================================
       - name: 检查 Cookie 文件
         working-directory: scripts
@@ -65,9 +65,9 @@ jobs:
           fi
       
       # ============================================================
-      # Step 6: 可选 - 从 Secrets 更新 Cookie（如果私库文件需要更新）
+      # Step 6: 从 Secrets 更新 Cookie（如果配置了）
       # ============================================================
-      - name: 更新 Cookie（如果需要）
+      - name: 更新 Cookie（从 Secrets）
         working-directory: scripts
         env:
           SESSION_COOKIE_NAME: ${{ secrets.SESSION_COOKIE_NAME }}
@@ -79,41 +79,152 @@ jobs:
           if [ -n "$SESSION_COOKIE_VALUE" ] && [ -n "$REMEMBER_COOKIE_VALUE" ]; then
             echo "🔄 使用 Secrets 更新 Cookie 文件..."
             
-            cat > bot_hosting_cookie.json << 'EOF'
-            {
-              "cookies": {
-                "session": {
-                  "name": "$SESSION_COOKIE_NAME",
-                  "value": "$SESSION_COOKIE_VALUE",
-                  "domain": "bot-hosting.net",
-                  "path": "/"
+            # 使用 Python 生成 JSON 文件（避免 here-document 问题）
+            python3 << 'PYTHON_SCRIPT'
+            import json
+            import os
+            from datetime import datetime
+            
+            cookie_data = {
+                "cookies": {
+                    "session": {
+                        "name": os.environ.get('SESSION_COOKIE_NAME', 'pterodactyl_session'),
+                        "value": os.environ.get('SESSION_COOKIE_VALUE', ''),
+                        "domain": "bot-hosting.net",
+                        "path": "/"
+                    },
+                    "remember": {
+                        "name": os.environ.get('REMEMBER_COOKIE_NAME', 'remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d'),
+                        "value": os.environ.get('REMEMBER_COOKIE_VALUE', ''),
+                        "domain": "bot-hosting.net",
+                        "path": "/"
+                    }
                 },
-                "remember": {
-                  "name": "$REMEMBER_COOKIE_NAME",
-                  "value": "$REMEMBER_COOKIE_VALUE",
-                  "domain": "bot-hosting.net",
-                  "path": "/"
-                }
-              },
-              "url": "https://bot-hosting.net",
-              "timestamp": "$(date '+%Y-%m-%d %H:%M:%S')",
-              "note": "GitHub Actions 自动生成（从 Secrets 更新）"
+                "url": "https://bot-hosting.net",
+                "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                "note": "GitHub Actions 自动生成（从 Secrets 更新）"
             }
-            EOF
             
-            # 替换环境变量
-            sed -i "s|\$SESSION_COOKIE_NAME|$SESSION_COOKIE_NAME|g" bot_hosting_cookie.json
-            sed -i "s|\$SESSION_COOKIE_VALUE|$SESSION_COOKIE_VALUE|g" bot_hosting_cookie.json
-            sed -i "s|\$REMEMBER_COOKIE_NAME|$REMEMBER_COOKIE_NAME|g" bot_hosting_cookie.json
-            sed -i "s|\$REMEMBER_COOKIE_VALUE|$REMEMBER_COOKIE_VALUE|g" bot_hosting_cookie.json
+            with open('bot_hosting_cookie.json', 'w', encoding='utf-8') as f:
+                json.dump(cookie_data, f, indent=2, ensure_ascii=False)
             
-            echo "✅ Cookie 文件已更新"
+            print("✅ Cookie 文件已更新")
+            PYTHON_SCRIPT
+            
+            echo "📄 更新后的文件内容:"
+            cat bot_hosting_cookie.json | head -20
           else
             echo "ℹ️ 未设置 Secrets，使用私库中的 Cookie 文件"
           fi
       
       # ============================================================
-      # Step 7: 运行续期脚本
+      # Step 7: 转换 Cookie 格式（如果需要）
+      # ============================================================
+      - name: 转换 Cookie 格式
+        working-directory: scripts
+        run: |
+          echo "🔧 检查 Cookie 格式..."
+          
+          # 使用 Python 检查和转换 Cookie 格式
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          
+          cookie_file = 'bot_hosting_cookie.json'
+          
+          if not os.path.exists(cookie_file):
+              print("❌ Cookie 文件不存在")
+              exit(1)
+          
+          with open(cookie_file, 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          
+          # 检查是否包含 all_cookies（Discord Cookie 格式）
+          if 'all_cookies' in data:
+              print("📌 检测到 Discord Cookie 格式，尝试转换...")
+              
+              # 提取 session 和 remember
+              session_cookie = None
+              remember_cookie = None
+              
+              for cookie in data.get('all_cookies', []):
+                  name = cookie.get('name', '')
+                  if 'pterodactyl_session' in name:
+                      session_cookie = cookie
+                  elif 'remember_web' in name:
+                      remember_cookie = cookie
+              
+              if session_cookie and remember_cookie:
+                  # 转换为 bot-hosting 格式
+                  converted_data = {
+                      "cookies": {
+                          "session": {
+                              "name": session_cookie.get('name'),
+                              "value": session_cookie.get('value'),
+                              "domain": "bot-hosting.net",
+                              "path": "/"
+                          },
+                          "remember": {
+                              "name": remember_cookie.get('name'),
+                              "value": remember_cookie.get('value'),
+                              "domain": "bot-hosting.net",
+                              "path": "/"
+                          }
+                      },
+                      "url": "https://bot-hosting.net",
+                      "timestamp": data.get('timestamp', ''),
+                      "note": "从 Discord Cookie 转换"
+                  }
+                  
+                  with open(cookie_file, 'w', encoding='utf-8') as f:
+                      json.dump(converted_data, f, indent=2, ensure_ascii=False)
+                  
+                  print("✅ Cookie 格式转换成功")
+              else:
+                  print("⚠️ 未找到 session 或 remember Cookie")
+                  print("📋 当前 Cookie 名称:")
+                  for cookie in data.get('all_cookies', []):
+                      print(f"  - {cookie.get('name', 'unknown')}")
+          else:
+              print("✅ Cookie 格式正确")
+          
+          PYTHON_SCRIPT
+      
+      # ============================================================
+      # Step 8: 验证 Cookie 文件
+      # ============================================================
+      - name: 验证 Cookie 文件
+        working-directory: scripts
+        run: |
+          echo "🔍 验证 Cookie 文件..."
+          
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          
+          with open('bot_hosting_cookie.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          
+          # 检查是否有 cookies 字段
+          if 'cookies' in data:
+              cookies = data['cookies']
+              print(f"✅ 找到 cookies 字段，包含 {len(cookies)} 个 Cookie")
+              
+              for key in ['session', 'remember']:
+                  if key in cookies:
+                      cookie = cookies[key]
+                      name = cookie.get('name', 'unknown')
+                      value = cookie.get('value', '')
+                      print(f"  ✅ {key}: {name} = {value[:20]}...")
+                  else:
+                      print(f"  ⚠️ 缺少 {key} Cookie")
+          else:
+              print("⚠️ 未找到 cookies 字段")
+              print(f"📋 文件包含: {list(data.keys())}")
+          
+          PYTHON_SCRIPT
+      
+      # ============================================================
+      # Step 9: 运行续期脚本
       # ============================================================
       - name: 运行续期脚本
         working-directory: scripts
@@ -126,14 +237,17 @@ jobs:
           echo "🚀 开始执行续期脚本..."
           echo "📅 当前时间: $(date '+%Y-%m-%d %H:%M:%S')"
           echo "📁 工作目录: $(pwd)"
-          echo "📄 Cookie 文件: $(ls -la bot_hosting_cookie.json || echo '未找到')"
+          echo "📄 Cookie 文件:"
+          cat bot_hosting_cookie.json
+          echo ""
+          echo "=========================================="
           python main.py
       
       # ============================================================
-      # Step 8: 提交更新后的 Cookie（如果脚本更新了 Cookie）
+      # Step 10: 提交更新后的 Cookie（如果脚本更新了 Cookie）
       # ============================================================
       - name: 提交 Cookie 更新到私库
-        if: always()  # 无论成功与否都尝试提交
+        if: always()
         working-directory: scripts
         run: |
           # 检查 Cookie 文件是否有变化
@@ -156,7 +270,7 @@ jobs:
           fi
       
       # ============================================================
-      # Step 9: 保存运行日志（用于调试）
+      # Step 11: 保存运行日志
       # ============================================================
       - name: 保存运行日志
         if: always()
@@ -171,15 +285,17 @@ jobs:
           fi
           
           # 创建日志文件
-          echo "=== 运行日志 ===" > run_log.txt
-          echo "时间: $(date '+%Y-%m-%d %H:%M:%S')" >> run_log.txt
-          echo "Python 版本: $(python --version)" >> run_log.txt
-          echo "工作目录: $(pwd)" >> run_log.txt
-          echo "文件列表:" >> run_log.txt
-          ls -la >> run_log.txt
+          {
+            echo "=== 运行日志 ==="
+            echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "Python 版本: $(python --version)"
+            echo "工作目录: $(pwd)"
+            echo "文件列表:"
+            ls -la
+          } > run_log.txt
       
       # ============================================================
-      # Step 10: 上传响应 JSON 文件（用于调试）
+      # Step 12: 上传响应 JSON 文件
       # ============================================================
       - name: 上传响应 JSON 文件
         uses: actions/upload-artifact@v4
@@ -193,7 +309,7 @@ jobs:
           retention-days: 7
       
       # ============================================================
-      # Step 11: 发送通知到 Telegram（使用独立脚本）
+      # Step 13: 发送 Telegram 通知
       # ============================================================
       - name: 发送续期结果通知
         if: always()
@@ -214,18 +330,41 @@ jobs:
               STATUS_TEXT="失败"
             fi
             
-            MESSAGE="$STATUS_ICON Bot-Hosting.net 续期任务完成
-            📅 时间: $(date '+%Y-%m-%d %H:%M:%S')
-            📊 状态: $STATUS_TEXT
-            📁 仓库: fgnb666/bot-hosting.net-xuqi
-            🔗 查看详情: https://github.com/fgnb666/bot-hosting.net-xuqi/actions"
+            MESSAGE="${STATUS_ICON} Bot-Hosting.net 续期任务完成
+        📅 时间: $(date '+%Y-%m-%d %H:%M:%S')
+        📊 状态: ${STATUS_TEXT}
+        📁 仓库: fgnb666/bot-hosting.net-xuqi
+        🔗 查看详情: https://github.com/fgnb666/bot-hosting.net-xuqi/actions"
             
-            # 使用 curl 发送
-            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-              -H "Content-Type: application/json" \
-              -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"$MESSAGE\"}"
+            # 使用 Python 发送（避免 curl 转义问题）
+            python3 << 'PYTHON_SCRIPT'
+            import os
+            import json
+            import urllib.request
             
-            echo "✅ Telegram 通知已发送"
+            token = os.environ.get('TELEGRAM_BOT_TOKEN')
+            chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+            message = """${STATUS_ICON} Bot-Hosting.net 续期任务完成
+        📅 时间: $(date '+%Y-%m-%d %H:%M:%S')
+        📊 状态: ${STATUS_TEXT}
+        📁 仓库: fgnb666/bot-hosting.net-xuqi
+        🔗 查看详情: https://github.com/fgnb666/bot-hosting.net-xuqi/actions"""
+            
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = json.dumps({
+                "chat_id": chat_id,
+                "text": message
+            }).encode('utf-8')
+            
+            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+            response = urllib.request.urlopen(req)
+            
+            if response.getcode() == 200:
+                print("✅ Telegram 通知已发送")
+            else:
+                print(f"❌ Telegram 通知发送失败: {response.getcode()}")
+            PYTHON_SCRIPT
+            
           else
             echo "ℹ️ 未配置 Telegram，跳过通知"
           fi
