@@ -67,4 +67,4 @@ jobs:
         if: always()
         with:
           name: logs
-          path: scripts/response_*.json
+          path: scripts/*.json
