@@ -25,7 +25,9 @@ jobs:
       
       - name: 安装依赖
         working-directory: scripts
-        run: pip install camoufox
+        run: |
+          pip install playwright
+          python -m playwright install firefox
       
       - name: 创建 Cookie
         working-directory: scripts
@@ -54,17 +56,15 @@ jobs:
           }
           EOF
       
-      - name: 运行续期
+      - name: 运行测试登录
         working-directory: scripts
         env:
           HEADLESS: 'true'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
       
-      - name: 上传日志
+      - name: 上传日志和截图
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs
-          path: scripts/*.json
+          path: scripts/*.png
