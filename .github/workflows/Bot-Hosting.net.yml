@@ -12,7 +12,7 @@ jobs:
     
     steps:
       # ============================================================
-      # Step 1: 检出私有仓库（包含 Cookie 和脚本）
+      # Step 1: 检出私有仓库
       # ============================================================
       - name: 检出私有仓库
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
           pip install camoufox -q
       
       # ============================================================
-      # Step 4: 检查并转换 Cookie 文件
+      # Step 4: 准备 Cookie 文件
       # ============================================================
       - name: 准备 Cookie 文件
         working-directory: scripts
@@ -51,11 +51,9 @@ jobs:
         run: |
           echo "📁 检查 Cookie 文件..."
           
-          # 如果 Secrets 存在，优先使用 Secrets
           if [ -n "$SESSION_COOKIE_VALUE" ] && [ -n "$REMEMBER_COOKIE_VALUE" ]; then
             echo "🔄 使用 Secrets 创建 Cookie 文件..."
-            
-            python3 -c "
+            python3 << 'EOF'
 import json
 import os
 from datetime import datetime
@@ -77,129 +75,23 @@ cookie_data = {
     },
     'url': 'https://bot-hosting.net',
     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    'note': 'GitHub Actions 自动生成（从 Secrets 更新）'
+    'note': 'GitHub Actions 自动生成'
 }
 
 with open('bot_hosting_cookie.json', 'w', encoding='utf-8') as f:
     json.dump(cookie_data, f, indent=2, ensure_ascii=False)
 
-print('✅ Cookie 文件已从 Secrets 创建')
-"
+print('✅ Cookie 文件已创建')
+EOF
           elif [ -f "bot_hosting_cookie.json" ]; then
             echo "✅ 找到 Cookie 文件"
-            
-            # 检查和转换格式
-            python3 -c "
-import json
-import os
-
-cookie_file = 'bot_hosting_cookie.json'
-
-with open(cookie_file, 'r', encoding='utf-8') as f:
-    data = json.load(f)
-
-# 检查是否包含 all_cookies（Discord Cookie 格式）
-if 'all_cookies' in data:
-    print('📌 检测到 Discord Cookie 格式，尝试转换...')
-    
-    session_cookie = None
-    remember_cookie = None
-    
-    for cookie in data.get('all_cookies', []):
-        name = cookie.get('name', '')
-        if 'pterodactyl_session' in name:
-            session_cookie = cookie
-        elif 'remember_web' in name:
-            remember_cookie = cookie
-    
-    if session_cookie and remember_cookie:
-        converted_data = {
-            'cookies': {
-                'session': {
-                    'name': session_cookie.get('name'),
-                    'value': session_cookie.get('value'),
-                    'domain': 'bot-hosting.net',
-                    'path': '/'
-                },
-                'remember': {
-                    'name': remember_cookie.get('name'),
-                    'value': remember_cookie.get('value'),
-                    'domain': 'bot-hosting.net',
-                    'path': '/'
-                }
-            },
-            'url': 'https://bot-hosting.net',
-            'timestamp': data.get('timestamp', ''),
-            'note': '从 Discord Cookie 转换'
-        }
-        
-        with open(cookie_file, 'w', encoding='utf-8') as f:
-            json.dump(converted_data, f, indent=2, ensure_ascii=False)
-        
-        print('✅ Cookie 格式转换成功')
-    else:
-        print('⚠️ 未找到 session 或 remember Cookie')
-elif 'cookies' in data:
-    print('✅ Cookie 格式正确')
-    cookies = data.get('cookies', {})
-    for key in ['session', 'remember']:
-        if key in cookies:
-            name = cookies[key].get('name', 'unknown')
-            value = cookies[key].get('value', '')
-            print(f'  ✅ {key}: {name} = {value[:20]}...')
-else:
-    print('⚠️ 未知的 Cookie 格式')
-    print(f'📋 文件包含: {list(data.keys())}')
-"
           else
             echo "❌ 未找到 Cookie 文件且未设置 Secrets"
-            echo "💡 请确保私库中包含 bot_hosting_cookie.json 或设置 Secrets"
             exit 1
           fi
       
       # ============================================================
-      # Step 5: 验证 Cookie 文件
-      # ============================================================
-      - name: 验证 Cookie
-        working-directory: scripts
-        run: |
-          echo "🔍 验证 Cookie 文件..."
-          
-          python3 -c "
-import json
-import sys
-
-try:
-    with open('bot_hosting_cookie.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    if 'cookies' in data:
-        cookies = data['cookies']
-        if 'session' in cookies and 'remember' in cookies:
-            session_value = cookies['session'].get('value', '')
-            remember_value = cookies['remember'].get('value', '')
-            
-            if session_value and remember_value:
-                print('✅ Cookie 验证通过')
-                print(f'  📌 Session: {session_value[:20]}...')
-                print(f'  📌 Remember: {remember_value[:20]}...')
-            else:
-                print('❌ Cookie 值为空')
-                sys.exit(1)
-        else:
-            print('❌ 缺少 session 或 remember Cookie')
-            sys.exit(1)
-    else:
-        print('❌ 缺少 cookies 字段')
-        sys.exit(1)
-        
-except Exception as e:
-    print(f'❌ 验证失败: {e}')
-    sys.exit(1)
-"
-      
-      # ============================================================
-      # Step 6: 运行续期脚本
+      # Step 5: 运行续期脚本
       # ============================================================
       - name: 运行续期脚本
         working-directory: scripts
@@ -211,149 +103,44 @@ except Exception as e:
         run: |
           echo "🚀 开始执行续期脚本..."
           echo "📅 当前时间: $(date '+%Y-%m-%d %H:%M:%S')"
-          echo "📁 工作目录: $(pwd)"
-          echo "=========================================="
-          
-          # 显示 Cookie 文件内容（隐藏敏感值）
-          python3 -c "
-import json
-with open('bot_hosting_cookie.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
-    if 'cookies' in data:
-        for key in data['cookies']:
-            if key in ['session', 'remember']:
-                value = data['cookies'][key].get('value', '')
-                print(f'  {key}: {value[:10]}...{value[-10:]}' if len(value) > 20 else f'  {key}: {value}')
-"
-          
-          echo "=========================================="
           python main.py
       
       # ============================================================
-      # Step 7: 提交更新（如果 Cookie 有变化）
-      # ============================================================
-      - name: 提交 Cookie 更新
-        if: always()
-        working-directory: scripts
-        run: |
-          # 检查 Cookie 文件是否有变化
-          if git diff --quiet bot_hosting_cookie.json 2>/dev/null; then
-            echo "ℹ️ Cookie 文件无变化，跳过提交"
-          else
-            echo "📝 Cookie 文件有变化，准备提交..."
-            
-            # 配置 Git
-            git config user.name "GitHub Actions Bot"
-            git config user.email "actions@github.com"
-            
-            # 添加并提交
-            git add bot_hosting_cookie.json
-            git commit -m "🔄 自动更新 Cookie [$(date '+%Y-%m-%d %H:%M:%S')]" || echo "ℹ️ 无变化需要提交"
-            
-            # 推送到私库
-            git push || echo "⚠️ 推送失败，可能无权限或冲突"
-            echo "✅ Cookie 已更新并推送到私库"
-          fi
-      
-      # ============================================================
-      # Step 8: 保存运行日志
+      # Step 6: 保存日志
       # ============================================================
       - name: 保存运行日志
         if: always()
         working-directory: scripts
         run: |
-          # 收集所有 response 文件
-          if ls response_*.json 1>/dev/null 2>&1; then
-            echo "📊 收集到响应文件:"
-            ls -la response_*.json
-          else
-            echo "ℹ️ 无响应文件"
-          fi
-          
-          # 创建日志文件
           {
             echo "=== 运行日志 ==="
             echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
-            echo "Python 版本: $(python --version)"
-            echo "工作目录: $(pwd)"
-            echo ""
-            echo "=== 文件列表 ==="
             ls -la
-            echo ""
-            echo "=== Cookie 文件内容 ==="
-            cat bot_hosting_cookie.json 2>/dev/null || echo "Cookie 文件不存在"
           } > run_log.txt
       
       # ============================================================
-      # Step 9: 上传响应文件
+      # Step 7: 上传响应文件
       # ============================================================
       - name: 上传响应 JSON 文件
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: response-json
-          path: |
-            scripts/response_*.json
-            scripts/run_log.txt
-            scripts/bot_hosting_cookie.json
+          path: scripts/response_*.json
           retention-days: 7
       
       # ============================================================
-      # Step 10: 发送 Telegram 通知
+      # Step 8: 发送 Telegram 通知
       # ============================================================
       - name: 发送续期结果通知
         if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RENEW_STATUS: ${{ job.status }}
-          JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
             echo "📱 发送 Telegram 通知..."
-            
-            python3 -c "
-import os
-import json
-import urllib.request
-from datetime import datetime
-
-token = os.environ.get('TELEGRAM_BOT_TOKEN')
-chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-status = os.environ.get('RENEW_STATUS', 'unknown')
-job_url = os.environ.get('JOB_URL', '')
-
-if status == 'success':
-    icon = '✅'
-    status_text = '成功'
-else:
-    icon = '❌'
-    status_text = '失败'
-
-message = f'''{icon} Bot-Hosting.net 续期任务完成
-
-📅 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-📊 状态: {status_text}
-📁 仓库: fgnb666/bot-hosting.net-xuqi
-🔗 查看详情: {job_url}'''
-
-url = f'https://api.telegram.org/bot{token}/sendMessage'
-data = json.dumps({
-    'chat_id': chat_id,
-    'text': message
-}).encode('utf-8')
-
-try:
-    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
-    response = urllib.request.urlopen(req, timeout=30)
-    
-    if response.getcode() == 200:
-        print('✅ Telegram 通知已发送')
-    else:
-        print(f'⚠️ Telegram 响应: {response.getcode()}')
-except Exception as e:
-    print(f'⚠️ Telegram 发送失败: {e}')
-"
-          else
-            echo "ℹ️ 未配置 Telegram，跳过通知"
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"✅ Bot-Hosting.net 续期任务完成\n时间: $(date '+%Y-%m-%d %H:%M:%S')\"}"
           fi
