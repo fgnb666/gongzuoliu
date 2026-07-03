@@ -1,70 +1,636 @@
-name: Bot-Hosting.net
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Bot-Hosting.net 自动续期脚本 (Playwright 版本)
+使用 Playwright + 反检测脚本
+"""
 
-on:
-  schedule:
-    - cron: '0 4 * * *'
-  workflow_dispatch:
+import os
+import sys
+import time
+import json
+import subprocess
+from datetime import datetime
+from playwright.sync_api import sync_playwright
 
-jobs:
-  renew:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: 检出私有仓库
-        uses: actions/checkout@v4
-        with:
-          repository: fgnb666/bot-hosting.net-xuqi
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: scripts
-      
-      - name: 安装 Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: 安装依赖
-        working-directory: scripts
-        run: |
-          pip install playwright
-          python -m playwright install firefox
-      
-      - name: 创建 Cookie
-        working-directory: scripts
-        env:
-          SESSION_COOKIE_NAME: ${{ secrets.SESSION_COOKIE_NAME }}
-          SESSION_COOKIE_VALUE: ${{ secrets.SESSION_COOKIE_VALUE }}
-          REMEMBER_COOKIE_NAME: ${{ secrets.REMEMBER_COOKIE_NAME }}
-          REMEMBER_COOKIE_VALUE: ${{ secrets.REMEMBER_COOKIE_VALUE }}
-        run: |
-          cat > bot_hosting_cookie.json << EOF
-          {
-            "cookies": {
-              "session": {
-                "name": "${SESSION_COOKIE_NAME}",
-                "value": "${SESSION_COOKIE_VALUE}",
-                "domain": "bot-hosting.net",
-                "path": "/"
-              },
-              "remember": {
-                "name": "${REMEMBER_COOKIE_NAME}",
-                "value": "${REMEMBER_COOKIE_VALUE}",
-                "domain": "bot-hosting.net",
-                "path": "/"
-              }
+# =====================================================================
+#                           配置
+# =====================================================================
+
+BOT_HOSTING_URL = 'https://bot-hosting.net'
+PANEL_DOMAIN = 'bot-hosting.net'
+COOKIE_FILE = 'bot_hosting_cookie.json'
+BILLING_URL = 'https://bot-hosting.net/a/billings'  # 续期页面
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or ""
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or ""
+HEADLESS = os.getenv('HEADLESS', 'true').lower() == 'true'
+
+# =====================================================================
+#                           反检测脚本
+# =====================================================================
+
+def get_stealth_scripts():
+    """返回反检测 JavaScript 脚本"""
+    return """
+    // 隐藏 WebDriver
+    Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined
+    });
+    
+    // 隐藏 Chrome 特征
+    Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5]
+    });
+    
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['zh-CN', 'zh', 'en']
+    });
+    
+    // 修改 User Agent
+    Object.defineProperty(navigator, 'userAgent', {
+        get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
+    
+    // 修改平台
+    Object.defineProperty(navigator, 'platform', {
+        get: () => 'Win32'
+    });
+    
+    // 修改硬件并发数
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+        get: () => 8
+    });
+    
+    // 修改设备内存
+    Object.defineProperty(navigator, 'deviceMemory', {
+        get: () => 8
+    });
+    
+    // 修改屏幕尺寸
+    Object.defineProperty(screen, 'width', {
+        get: () => 1920
+    });
+    
+    Object.defineProperty(screen, 'height', {
+        get: () => 1080
+    });
+    
+    // 修改颜色深度
+    Object.defineProperty(screen, 'colorDepth', {
+        get: () => 24
+    });
+    
+    // 禁用自动化特征
+    window.chrome = {
+        runtime: {},
+        loadTimes: function() {},
+        csi: function() {},
+        app: {}
+    };
+    
+    // 修改 WebGL 供应商
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+        if (parameter === 37445) {
+            return 'Intel Inc.';
+        }
+        if (parameter === 37446) {
+            return 'Intel Iris OpenGL Engine';
+        }
+        return getParameter(parameter);
+    };
+    
+    // 修改 Canvas 指纹
+    const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function(type) {
+        if (type === 'image/png') {
+            const context = this.getContext('2d');
+            const imageData = context.getImageData(0, 0, this.width, this.height);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] += Math.floor(Math.random() * 2);
             }
-          }
-          EOF
-      
-      - name: 运行测试登录
-        working-directory: scripts
-        env:
-          HEADLESS: 'true'
-        run: python main.py
-      
-      - name: 上传日志和截图
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: logs
-          path: scripts/*.png
+            context.putImageData(imageData, 0, 0);
+        }
+        return originalToDataURL.apply(this, arguments);
+    };
+    
+    // 修改 WebGL 指纹
+    const originalGetExtension = WebGLRenderingContext.prototype.getExtension;
+    WebGLRenderingContext.prototype.getExtension = function(name) {
+        if (name === 'WEBGL_debug_renderer_info') {
+            return null;
+        }
+        return originalGetExtension.apply(this, arguments);
+    };
+    
+    console.log('✅ 反检测脚本已注入');
+    """
+
+# =====================================================================
+#                           工具函数
+# =====================================================================
+
+def load_cookies():
+    """加载 Cookie"""
+    if not os.path.exists(COOKIE_FILE):
+        print(f"❌ Cookie 文件不存在: {COOKIE_FILE}")
+        return None
+    
+    try:
+        with open(COOKIE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if 'cookies' in data:
+                return data['cookies']
+            return data
+    except Exception as e:
+        print(f"❌ 加载 Cookie 失败: {e}")
+        return None
+
+def save_json(data, filename):
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except:
+        pass
+
+def get_cookies_list(cookies_dict):
+    """将 Cookie 字典转换为浏览器需要的格式"""
+    cookies = []
+    
+    if 'session' in cookies_dict:
+        session = cookies_dict['session']
+        cookies.append({
+            'name': session.get('name', 'pterodactyl_session'),
+            'value': session.get('value', ''),
+            'domain': session.get('domain', PANEL_DOMAIN),
+            'path': session.get('path', '/'),
+            'httpOnly': True,
+            'secure': True,
+            'sameSite': 'Lax'
+        })
+    
+    if 'remember' in cookies_dict:
+        remember = cookies_dict['remember']
+        cookies.append({
+            'name': remember.get('name', 'remember_web'),
+            'value': remember.get('value', ''),
+            'domain': remember.get('domain', PANEL_DOMAIN),
+            'path': remember.get('path', '/'),
+            'expires': int(time.time()) + 3600 * 24 * 365,
+            'httpOnly': True,
+            'secure': True,
+            'sameSite': 'Lax'
+        })
+    
+    return cookies
+
+def format_bytes(size_bytes):
+    size_mb = size_bytes / (1024 * 1024)
+    if size_mb >= 1024:
+        return f"{size_mb / 1024:.1f} GB"
+    return f"{size_mb:.1f} MB"
+
+# =====================================================================
+#                           浏览器管理
+# =====================================================================
+
+class BotBrowser:
+    """浏览器管理类"""
+    
+    def __init__(self, headless=True):
+        self.headless = headless
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+    
+    def start(self):
+        """启动浏览器"""
+        print("🚀 启动浏览器...")
+        
+        self.playwright = sync_playwright().start()
+        
+        self.browser = self.playwright.firefox.launch(
+            headless=self.headless,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu'
+            ]
+        )
+        
+        self.context = self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            locale='zh-CN',
+            timezone_id='Asia/Shanghai',
+            permissions=['geolocation'],
+            java_script_enabled=True
+        )
+        
+        self.page = self.context.new_page()
+        self.page.add_init_script(get_stealth_scripts())
+        
+        print("✅ 浏览器启动成功")
+        return self.page
+    
+    def close(self):
+        """关闭浏览器"""
+        try:
+            if self.browser:
+                self.browser.close()
+            if self.playwright:
+                self.playwright.stop()
+            print("✅ 浏览器已关闭")
+        except:
+            pass
+    
+    def set_cookies(self, cookies_dict):
+        """设置 Cookie"""
+        cookies = get_cookies_list(cookies_dict)
+        if cookies:
+            self.context.add_cookies(cookies)
+            print(f"✅ 已设置 {len(cookies)} 个 Cookie")
+            return True
+        return False
+    
+    def goto(self, url, timeout=60000):
+        """访问页面"""
+        try:
+            self.page.goto(url, wait_until='domcontentloaded', timeout=timeout)
+            return True
+        except Exception as e:
+            print(f"❌ 页面加载失败: {e}")
+            return False
+    
+    def screenshot(self, filename):
+        """截图"""
+        try:
+            self.page.screenshot(path=filename)
+            print(f"📸 截图已保存: {filename}")
+            return True
+        except:
+            return False
+    
+    def wait_for_selector(self, selector, timeout=30000):
+        """等待元素出现"""
+        try:
+            self.page.wait_for_selector(selector, timeout=timeout)
+            return True
+        except:
+            return False
+
+# =====================================================================
+#                           Cloudflare 验证处理
+# =====================================================================
+
+def handle_cloudflare(page, max_wait=30):
+    """处理 Cloudflare 验证（包括 Turnstile）"""
+    print("🛡 检查 Cloudflare 验证...")
+    
+    try:
+        # 等待页面加载
+        time.sleep(2)
+        
+        # 检查 5秒盾
+        title = page.title() if page.title() else ""
+        if "Just a moment..." in title:
+            print("   ⏳ 检测到 5秒盾，等待...")
+            time.sleep(8)
+            print("   ✅ 5秒盾通过")
+        
+        # 检查 Turnstile 验证
+        cf_input = page.locator('input[name="cf-turnstile-response"]')
+        if cf_input.count() > 0:
+            print("   🔰 检测到 Turnstile 验证")
+            
+            # 尝试点击 iframe
+            try:
+                frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"]')
+                if frame.count() > 0:
+                    frame.first.locator('body').click()
+                    print("      🔘 已点击验证框")
+                    time.sleep(3)
+            except:
+                pass
+            
+            # 尝试点击页面上的验证区域
+            try:
+                challenge = page.locator('.challenge-container, [class*="challenge"]')
+                if challenge.count() > 0:
+                    challenge.first.click()
+                    print("      🔘 已点击验证区域")
+                    time.sleep(2)
+            except:
+                pass
+            
+            # 等待验证完成
+            for i in range(max_wait):
+                if cf_input.count() > 0:
+                    value = cf_input.get_attribute("value")
+                    if value and len(value) > 10:
+                        print(f"   ✅ Turnstile 验证通过")
+                        return True
+                time.sleep(1)
+                if i % 5 == 0 and i > 0:
+                    print(f"      ⏳ 等待验证... ({i}s)")
+            
+            print(f"   ⚠️ Turnstile 验证超时")
+            return False
+        
+        # 检查是否有"验证您是人类"文字
+        try:
+            if page.locator('text="验证您是人类"').count() > 0:
+                print("   🔰 检测到人类验证页面")
+                # 尝试点击页面
+                page.mouse.click(100, 100)
+                time.sleep(2)
+                return True
+        except:
+            pass
+        
+        print("   ℹ️ 无需验证")
+        return True
+        
+    except Exception as e:
+        print(f"   ⚠️ Cloudflare 处理异常: {e}")
+        return True
+
+# =====================================================================
+#                           续期核心功能
+# =====================================================================
+
+def get_renew_info(page):
+    """获取续期页面信息"""
+    try:
+        # 获取订阅信息
+        subscription = page.locator('.subscription-info, [class*="subscription"]').first
+        if subscription.count() > 0:
+            text = subscription.text_content()
+            print(f"   📋 订阅信息: {text.strip()}")
+        
+        # 获取到期时间
+        expiry = page.locator('text="Expires"')
+        if expiry.count() > 0:
+            text = expiry.text_content()
+            print(f"   📅 {text.strip()}")
+        
+        # 检查续期按钮
+        renew_btn = page.locator('button:has-text("Renew")')
+        if renew_btn.count() > 0:
+            print(f"   🔘 找到续期按钮")
+            return True
+        
+        return False
+    except:
+        return False
+
+def click_renew_button(page):
+    """点击续期按钮"""
+    print("   🔘 点击续期按钮...")
+    
+    # 尝试多种选择器
+    selectors = [
+        'button:has-text("Renew")',
+        'button:has-text("续期")',
+        'button:has-text("Renew（-4d)")',
+        '[class*="renew"]',
+        'button:has(span:has-text("Renew"))',
+        'a:has-text("Renew")',
+        'button:has-text("Renew manually")',
+        'text="Renew"'
+    ]
+    
+    for selector in selectors:
+        try:
+            btn = page.locator(selector)
+            if btn.count() > 0:
+                # 滚动到按钮位置
+                btn.first.scroll_into_view_if_needed()
+                time.sleep(0.5)
+                btn.first.click()
+                print(f"      ✅ 点击成功: {selector}")
+                return True
+        except:
+            continue
+    
+    print(f"      ❌ 未找到续期按钮")
+    return False
+
+def click_renew_confirm(page):
+    """点击确认续期按钮（验证后）"""
+    print("   🔘 点击确认续期...")
+    
+    # 等待确认按钮出现
+    time.sleep(2)
+    
+    selectors = [
+        'button:has-text("Renew")',
+        'button:has-text("确认续期")',
+        'button:has-text("Confirm Renew")',
+        'button:has-text("续期")',
+        '[class*="confirm"]',
+        'button[type="submit"]'
+    ]
+    
+    for selector in selectors:
+        try:
+            btn = page.locator(selector)
+            if btn.count() > 0 and btn.first.is_visible():
+                btn.first.scroll_into_view_if_needed()
+                time.sleep(0.5)
+                btn.first.click()
+                print(f"      ✅ 确认续期成功")
+                return True
+        except:
+            continue
+    
+    # 如果没有找到确认按钮，可能弹窗已经自动处理了
+    print(f"      ℹ️ 未找到确认按钮，可能已自动续期")
+    return False
+
+def wait_for_renew_result(page, timeout=30):
+    """等待续期结果"""
+    print(f"   ⏳ 等待续期结果...")
+    
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            # 检查是否有成功提示
+            success_texts = ['success', '成功', 'renewed', '续期成功', 'extended']
+            for text in success_texts:
+                if page.locator(f'text="{text}"').count() > 0:
+                    print(f"   ✅ 续期成功")
+                    return True
+            
+            # 检查是否有错误提示
+            error_texts = ['error', '失败', 'failed', '冷却']
+            for text in error_texts:
+                if page.locator(f'text="{text}"').count() > 0:
+                    print(f"   ❌ 续期失败")
+                    return False
+            
+            # 检查续期按钮是否消失或变成已续期状态
+            renew_btn = page.locator('button:has-text("Renew")')
+            if renew_btn.count() == 0:
+                print(f"   ✅ 续期按钮已消失，续期成功")
+                return True
+            
+            time.sleep(1)
+        except:
+            time.sleep(1)
+    
+    print(f"   ⚠️ 续期结果未知")
+    return None
+
+def perform_renew(page):
+    """执行完整的续期流程"""
+    print("\n" + "=" * 50)
+    print("🔄 开始执行续期...")
+    print("=" * 50)
+    
+    # 1. 访问续期页面
+    print(f"🌐 访问续期页面: {BILLING_URL}")
+    if not page.goto(BILLING_URL, timeout=60000):
+        print("❌ 无法访问续期页面")
+        return False
+    
+    time.sleep(3)
+    page.screenshot(path='billing_page.png')
+    
+    # 2. 处理 Cloudflare 验证
+    if not handle_cloudflare(page):
+        print("❌ Cloudflare 验证失败")
+        return False
+    
+    time.sleep(2)
+    
+    # 3. 获取续期页面信息
+    print("\n📋 续期页面信息:")
+    get_renew_info(page)
+    
+    # 4. 点击续期按钮
+    if not click_renew_button(page):
+        print("❌ 无法点击续期按钮")
+        return False
+    
+    # 5. 等待并处理可能出现的 Cloudflare 验证
+    print("\n🛡 检查续期验证...")
+    time.sleep(3)
+    
+    if not handle_cloudflare(page):
+        print("❌ 续期验证失败")
+        return False
+    
+    time.sleep(2)
+    
+    # 6. 点击确认续期
+    if not click_renew_confirm(page):
+        print("⚠️ 可能已自动续期")
+    
+    # 7. 等待续期结果
+    result = wait_for_renew_result(page)
+    
+    # 8. 截图保存结果
+    page.screenshot(path='renew_result.png')
+    
+    return result
+
+# =====================================================================
+#                           Telegram 通知
+# =====================================================================
+
+def send_telegram(message):
+    """发送 Telegram 通知"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+        subprocess.run([
+            'curl', '-s', '-X', 'POST', url,
+            '-H', 'Content-Type: application/json',
+            '-d', json.dumps(payload)
+        ], timeout=30, capture_output=True)
+        print("✅ Telegram 通知已发送")
+    except Exception as e:
+        print(f"⚠️ Telegram 发送失败: {e}")
+
+# =====================================================================
+#                           主函数
+# =====================================================================
+
+def main():
+    print("🤖 Bot-Hosting.net 续期脚本 (Playwright)")
+    print("=" * 50)
+    print(f"🔧 模式: {'无头' if HEADLESS else '可视化'}")
+    
+    # 加载 Cookie
+    cookies_dict = load_cookies()
+    if not cookies_dict:
+        print("❌ 未找到 Cookie")
+        return
+    
+    print(f"✅ 已加载 Cookie: {len(cookies_dict)} 个")
+    
+    bot = BotBrowser(headless=HEADLESS)
+    
+    try:
+        # 启动浏览器
+        page = bot.start()
+        
+        # 设置 Cookie
+        bot.set_cookies(cookies_dict)
+        
+        # 先访问首页确认登录
+        print(f"🌐 访问首页: {BOT_HOSTING_URL}")
+        if not bot.goto(BOT_HOSTING_URL):
+            return
+        
+        # 处理 Cloudflare
+        handle_cloudflare(page)
+        time.sleep(3)
+        
+        # 检查登录状态
+        if "login" in page.url or "auth" in page.url:
+            print("❌ 登录失败，Cookie 可能已过期")
+            return
+        
+        print("✅ 登录成功")
+        
+        # 执行续期
+        success = perform_renew(page)
+        
+        # 发送通知
+        if success:
+            msg = "✅ Bot-Hosting.net 续期成功!\n"
+            msg += f"📅 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            send_telegram(msg)
+            print("\n🎉 续期成功!")
+        else:
+            msg = "❌ Bot-Hosting.net 续期失败!\n"
+            msg += f"📅 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            send_telegram(msg)
+            print("\n❌ 续期失败")
+        
+    except Exception as e:
+        print(f"❌ 运行出错: {e}")
+        import traceback
+        traceback.print_exc()
+        
+    finally:
+        bot.close()
+
+if __name__ == "__main__":
+    # 安装 Playwright 浏览器
+    try:
+        subprocess.run([sys.executable, "-m", "playwright", "install", "firefox"], 
+                       capture_output=True, check=True)
+    except:
+        pass
+    
+    main()
