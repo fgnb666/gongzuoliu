@@ -1,4 +1,4 @@
-name: Bot-Hosting.net Auto Renew
+name: Bot-Hosting.net
 
 on:
   schedule:
