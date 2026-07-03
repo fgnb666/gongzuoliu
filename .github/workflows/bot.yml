@@ -1,36 +1,33 @@
-name: Bot-Hosting.net
+name: Bot-Hosting.net Auto Renew
 
 on:
   schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
     - cron: '0 4 * * *'
-  workflow_dispatch:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   renew:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: 检出私有仓库
+      - name: 检出私有仓库代码
         uses: actions/checkout@v4
         with:
           repository: fgnb666/bot-hosting.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
-      - name: 安装 Python
+      - name: 安装 Python 环境
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: 安装依赖
+      - name: 安装依赖包
         working-directory: scripts
-        run: |
-          pip install camoufox
-          sudo apt-get update
-          sudo apt-get install -y xvfb
+        run: pip install -r requirements.txt -q
       
-      - name: 创建 Cookie
+      - name: 创建 Cookie 文件
         working-directory: scripts
         env:
           SESSION_COOKIE_NAME: ${{ secrets.SESSION_COOKIE_NAME }}
@@ -38,36 +35,46 @@ jobs:
           REMEMBER_COOKIE_NAME: ${{ secrets.REMEMBER_COOKIE_NAME }}
           REMEMBER_COOKIE_VALUE: ${{ secrets.REMEMBER_COOKIE_VALUE }}
         run: |
-          cat > bot_hosting_cookie.json << EOF
+          cat > bot_hosting_cookie.json << 'EOF'
           {
             "cookies": {
               "session": {
-                "name": "${SESSION_COOKIE_NAME}",
-                "value": "${SESSION_COOKIE_VALUE}",
+                "name": "$SESSION_COOKIE_NAME",
+                "value": "$SESSION_COOKIE_VALUE",
                 "domain": "bot-hosting.net",
                 "path": "/"
               },
               "remember": {
-                "name": "${REMEMBER_COOKIE_NAME}",
-                "value": "${REMEMBER_COOKIE_VALUE}",
+                "name": "$REMEMBER_COOKIE_NAME",
+                "value": "$REMEMBER_COOKIE_VALUE",
                 "domain": "bot-hosting.net",
                 "path": "/"
               }
-            }
+            },
+            "url": "https://bot-hosting.net",
+            "timestamp": "$(date '+%Y-%m-%d %H:%M:%S')",
+            "note": "GitHub Actions 自动生成"
           }
           EOF
+          
+          # 替换环境变量
+          sed -i "s|\$SESSION_COOKIE_NAME|$SESSION_COOKIE_NAME|g" bot_hosting_cookie.json
+          sed -i "s|\$SESSION_COOKIE_VALUE|$SESSION_COOKIE_VALUE|g" bot_hosting_cookie.json
+          sed -i "s|\$REMEMBER_COOKIE_NAME|$REMEMBER_COOKIE_NAME|g" bot_hosting_cookie.json
+          sed -i "s|\$REMEMBER_COOKIE_VALUE|$REMEMBER_COOKIE_VALUE|g" bot_hosting_cookie.json
       
-      - name: 运行续期
+      - name: 运行续期脚本
         working-directory: scripts
         env:
           HEADLESS: 'true'
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: xvfb-run python main.py
+        run: python main.py
       
-      - name: 上传日志
+      - name: 上传响应 JSON 文件（用于调试）
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: logs
+          name: response-json
           path: scripts/response_*.json
+          retention-days: 7
