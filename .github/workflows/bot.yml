@@ -25,10 +25,7 @@ jobs:
       
       - name: 安装依赖
         working-directory: scripts
-        run: |
-          pip install camoufox
-          sudo apt-get update
-          sudo apt-get install -y xvfb
+        run: pip install camoufox
       
       - name: 创建 Cookie
         working-directory: scripts
@@ -63,7 +60,7 @@ jobs:
           HEADLESS: 'true'
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: xvfb-run python main.py
+        run: python main.py
       
       - name: 上传日志
         uses: actions/upload-artifact@v4
