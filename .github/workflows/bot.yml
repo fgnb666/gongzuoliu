@@ -10,78 +10,90 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 检出私有仓库
+      # ============================================================
+      # Step 1: 检出私库（包含脚本和配置）
+      # ============================================================
+      - name: 检出私库
         uses: actions/checkout@v4
         with:
           repository: fgnb666/bot-hosting.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
       
+      # ============================================================
+      # Step 2: 安装 Python
+      # ============================================================
       - name: 安装 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
+      # ============================================================
+      # Step 3: 安装依赖
+      # ============================================================
       - name: 安装依赖
         working-directory: scripts
         run: |
-          pip install playwright
-          python -m playwright install firefox
+          pip install -r requirements.txt -q
+          # 安装 Xvfb（虚拟显示，SeleniumBase UC Mode 需要）
+          sudo apt-get update
+          sudo apt-get install -y xvfb
       
-      - name: 创建 Cookie
-        working-directory: scripts
-        env:
-          SESSION_COOKIE_NAME: ${{ secrets.SESSION_COOKIE_NAME }}
-          SESSION_COOKIE_VALUE: ${{ secrets.SESSION_COOKIE_VALUE }}
-          REMEMBER_COOKIE_NAME: ${{ secrets.REMEMBER_COOKIE_NAME }}
-          REMEMBER_COOKIE_VALUE: ${{ secrets.REMEMBER_COOKIE_VALUE }}
+      # ============================================================
+      # Step 4: 安装 GitHub CLI（用于更新 Secrets）
+      # ============================================================
+      - name: 安装 GitHub CLI
         run: |
-          cat > bot_hosting_cookie.json << 'EOF'
-          {
-            "cookies": {
-              "session": {
-                "name": "${SESSION_COOKIE_NAME}",
-                "value": "${SESSION_COOKIE_VALUE}",
-                "domain": "bot-hosting.net",
-                "path": "/"
-              },
-              "remember": {
-                "name": "${REMEMBER_COOKIE_NAME}",
-                "value": "${REMEMBER_COOKIE_VALUE}",
-                "domain": "bot-hosting.net",
-                "path": "/"
-              }
-            }
-          }
-          EOF
-          
-          # 替换环境变量
-          sed -i "s|\${SESSION_COOKIE_NAME}|$SESSION_COOKIE_NAME|g" bot_hosting_cookie.json
-          sed -i "s|\${SESSION_COOKIE_VALUE}|$SESSION_COOKIE_VALUE|g" bot_hosting_cookie.json
-          sed -i "s|\${REMEMBER_COOKIE_NAME}|$REMEMBER_COOKIE_NAME|g" bot_hosting_cookie.json
-          sed -i "s|\${REMEMBER_COOKIE_VALUE}|$REMEMBER_COOKIE_VALUE|g" bot_hosting_cookie.json
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
       
-      - name: 验证 Cookie
+      # ============================================================
+      # Step 5: 验证私库文件
+      # ============================================================
+      - name: 验证文件
         working-directory: scripts
         run: |
-          cat bot_hosting_cookie.json
+          echo "📁 私库文件列表:"
+          ls -la
           echo ""
-          echo "✅ Cookie 文件已创建"
+          echo "📄 检查 main.py:"
+          head -20 main.py
       
-      - name: 运行续期
+      # ============================================================
+      # Step 6: 运行续期脚本
+      # ============================================================
+      - name: 运行续期脚本
         working-directory: scripts
         env:
-          HEADLESS: 'true'
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SESSION_TOKEN: ${{ secrets.SESSION_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          EMAIL: ${{ secrets.EMAIL }}
         run: python main.py
       
-      - name: 上传日志和截图
+      # ============================================================
+      # Step 7: 上传截图（调试用）
+      # ============================================================
+      - name: 上传截图
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: scripts/*.png
+          retention-days: 7
+      
+      # ============================================================
+      # Step 8: 上传运行日志
+      # ============================================================
+      - name: 上传日志
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs
           path: |
-            scripts/*.png
+            scripts/*.txt
             scripts/*.json
           retention-days: 7
