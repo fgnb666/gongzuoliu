@@ -25,7 +25,8 @@ jobs:
       - name: 安装依赖
         working-directory: scripts
         run: |
-          pip install DrissionPage requests
+          pip install -r requirements.txt -q
+          # 安装 Xvfb（虚拟显示，SeleniumBase UC Mode 需要）
           sudo apt-get update
           sudo apt-get install -y xvfb
       
@@ -45,8 +46,9 @@ jobs:
       - name: 运行续期脚本
         working-directory: scripts
         env:
+          SESSION_TOKEN: ${{ secrets.SESSION_TOKEN }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_NAME: fgnb666/bot-hosting.net-xuqi
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           EMAIL: ${{ secrets.EMAIL }}
@@ -58,5 +60,7 @@ jobs:
         if: always()
         with:
           name: screenshots
-          path: scripts/*.png
+          path: |
+            scripts/*.png
+            scripts/*.jpg
           retention-days: 7
