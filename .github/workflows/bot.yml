@@ -1,54 +1,168 @@
-name: Bot-Hosting.net
+name: bot
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: "19 16 * * *"
+  push:
+    paths:
+      - "**/*.py"
+      - "**/*.js"
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
-  renew:
+  run-bot:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: 检出私库
+      - name: Checkout 私库
         uses: actions/checkout@v4
         with:
           repository: fgnb666/bot-hosting.net-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
-      - name: 安装 Python
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: 安装依赖
-        working-directory: scripts
+          python-version: "3.10"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system dependencies
         run: |
-          pip install -r requirements.txt -q
           sudo apt-get update
-          sudo apt-get install -y xvfb
-      
-      - name: 配置 Git（用于更新私库）
+          sudo apt-get install -y \
+            xvfb \
+            wget \
+            curl \
+            unzip \
+            xdotool \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libgtk-3-0 \
+            libxss1 \
+            libasound2t64 \
+            ca-certificates \
+            fonts-liberation \
+            fonts-noto-color-emoji
+          sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser
+
+      - name: Install Python dependencies
         working-directory: scripts
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-      
-      - name: 运行续期脚本
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install \
+            seleniumbase \
+            requests \
+            DrissionPage \
+            DataRecorder \
+            DownloadKit \
+            FlowViewer \
+            lxml \
+            websocket-client \
+            psutil
+
+      - name: Install Playwright
+        run: |
+          npm install playwright
+          npx playwright install chromium
+
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+
+      # =========================
+      # 🛡️ 启动 GOST
+      # =========================
+      - name: 🛡️ 启动 GOST
+        if: ${{ env.BOT_GOST_PROXY != '' }}
+        env:
+          BOT_GOST_PROXY: ${{ secrets.BOT_GOST_PROXY }}
+        run: |
+          set -e
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST VERSION: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          echo "🚀 启动 GOST..."
+          nohup ./gost -L http://:8080 -F "$BOT_GOST_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "✅ 测试代理"
+          MASKED_IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\([0-9]*\.[0-9]*\)\..*/\1.**.**/g')
+          echo "IP: $MASKED_IP"
+
+      - name: Discord OAuth Login
         working-directory: scripts
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          EMAIL: ${{ secrets.EMAIL }}
-          HEADLESS: 'false'
-        run: python main.py
-      
-      - name: 上传截图
+          BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+          BOT_PASSWORD: ${{ secrets.BOT_PASSWORD }}
+          BOT_GOST_PROXY: http://127.0.0.1:8080
+        run: |
+          node playwright_login.js || true
+
+      - name: Run Renew Bot
+        working-directory: scripts
+        env:
+          BOT_GOST_PROXY: http://127.0.0.1:8080
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HEADLESS: 'true'
+        run: |
+          xvfb-run -a python main.py
+
+      - name: Commit session_token 更新到私库
+        if: always()
+        working-directory: scripts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --quiet session_token; then
+            echo "ℹ️ session_token 无变化，跳过提交"
+          else
+            echo "📝 session_token 有变化，提交更新..."
+            git add session_token
+            git commit -m "🔄 自动更新 session_token [$(date '+%Y-%m-%d %H:%M:%S')]"
+            git push
+            echo "✅ session_token 已更新到私库"
+          fi
+
+      - name: Cleanup old workflow runs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runs=$(gh run list \
+            --workflow="${{ github.workflow }}" \
+            --limit 100 \
+            --json databaseId \
+            --jq '.[].databaseId')
+          count=0
+          for run_id in $runs; do
+            count=$((count + 1))
+            if [ "$count" -gt 1 ]; then
+              echo "Deleting run: $run_id"
+              gh run delete "$run_id" || true
+            fi
+          done
+
+      - name: Upload logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
+          name: logs
           path: scripts/*.png
           retention-days: 7
