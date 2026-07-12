@@ -2,58 +2,49 @@ name: Katabump
 
 on:
   schedule:
-    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
-    - cron: '0 4 * * *'
-  workflow_dispatch:  # 支持手动触发
+    # UTC 19:12（北京时间 03:12）
+    - cron: "12 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   renew:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout private repo
+      # ✅ 检出私库 katabump-auto
+      - name: Checkout private repo (katabump-auto)
         uses: actions/checkout@v4
         with:
           repository: fgnb666/dashboard.katabump.com-zidongxuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
+          python-version: "3.10"
+
+      # 📦 安装系统依赖 + Python 依赖
       - name: Install dependencies
-        run: |
-          pip install seleniumbase pyvirtualdisplay requests
-          if [ -f "scripts/requirements.txt" ]; then
-            pip install -r scripts/requirements.txt
-          fi
-      
-      - name: Setup Chrome and Xvfb
+        working-directory: scripts
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb google-chrome-stable
-      
-      - name: Run script
+          sudo apt-get install -y xvfb xdotool
+          sudo apt-get install -y chromium-browser
+          pip install --upgrade pip
+          pip install -r requirements.txt -q
+
+      # 🚀 执行 Katabump 批量续期
+      - name: Run Katabump renew script
+        working-directory: scripts
         env:
-          HEADLESS: 'true'
-          KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
-          KATABUMP_PASSWORD: ${{ secrets.KATABUMP_PASSWORD }}
+          KATABUMP_BATCH: ${{ secrets.KATABUMP_BATCH }}
+          HEADLESS: "true"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1920x1080x24 &
-          XVFB_PID=$!
-          python scripts/main.py
-          kill $XVFB_PID || true
-      
-      - name: Upload debug screenshot
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: debug-screenshot
-          path: /tmp/*.png
-          retention-days: 7
+          python kataBump_renew_batch.py
