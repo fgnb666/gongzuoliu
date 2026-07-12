@@ -29,14 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
       
-      - name: 安装 GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install -y gh
-      
-      - name: 配置 Git
+      - name: 配置 Git（用于更新私库）
         working-directory: scripts
         run: |
           git config user.name "GitHub Actions Bot"
@@ -45,8 +38,6 @@ jobs:
       - name: 运行续期脚本
         working-directory: scripts
         env:
-          SESSION_TOKEN: ${{ secrets.SESSION_TOKEN }}
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
@@ -59,7 +50,5 @@ jobs:
         if: always()
         with:
           name: screenshots
-          path: |
-            scripts/*.png
-            scripts/*.jpg
+          path: scripts/*.png
           retention-days: 7
