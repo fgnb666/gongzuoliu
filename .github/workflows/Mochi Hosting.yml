@@ -2,7 +2,7 @@ name: Mochi Hosting
 
 on:
   schedule:
-    - cron: '0 8 */3 * *'  # 每3天一次，北京时间8点
+    - cron: '0 8 */3 * *'
   workflow_dispatch:
 
 jobs:
@@ -22,16 +22,14 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 安装 Chrome 浏览器
+      - name: 安装 Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
           google-chrome --version
 
-      - name: 安装 Python 依赖
-        run: |
-          pip install --upgrade pip
-          pip install seleniumbase requests
+      - name: 安装依赖
+        run: pip install seleniumbase requests
 
       - name: 执行续期
         run: |
@@ -42,26 +40,23 @@ jobs:
           PASSWORD: ${{ secrets.AIDA_PASSWORD }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          # SeleniumBase 在 CI 环境必须用 headless
           HEADLESS: "true"
 
-      - name: 提交更新（如果有）
+      - name: 提交更新
         run: |
           cd ./mochi
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git add .
-          git diff --staged --quiet || git commit -m "自动续期更新 [skip ci]"
+          git diff --staged --quiet || git commit -m "自动续期 [skip ci]"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
 
-      - name: 上传截图（如果失败）
+      - name: 上传截图
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: mochi-screenshots
-          path: |
-            ./mochi/*.png
-            ./mochi/*.jpg
+          name: screenshots
+          path: ./mochi/*.png
           retention-days: 7
