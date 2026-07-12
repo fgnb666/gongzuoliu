@@ -25,7 +25,7 @@ jobs:
       - name: 安装依赖
         working-directory: scripts
         run: |
-          pip install seleniumbase requests
+          pip install DrissionPage requests
           sudo apt-get update
           sudo apt-get install -y xvfb
       
