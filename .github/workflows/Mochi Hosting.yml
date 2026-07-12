@@ -1,0 +1,105 @@
+name: Mochi Hosting
+
+on:
+  # 手动触发
+  workflow_dispatch:
+  # 定时触发（每天北京时间8点和20点）
+  schedule:
+    - cron: '0 0,12 * * *'  # UTC时间0点和12点 = 北京时间8点和20点
+
+env:
+  PRIVATE_REPO: "fgnb666/hosting.aida0710.work-xuqi"
+  SCRIPT_NAME: "aida_renew.py"
+  BRANCH: "main"
+
+jobs:
+  renew:
+    name: Mochi Hosting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🏷️ 开始 Mochi Hosting
+        run: echo "🚀 启动 Mochi Hosting 流程"
+
+      - name: 📦 检出当前仓库
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📥 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install seleniumbase requests
+
+      - name: 🔧 配置 Git 用户信息
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 🔐 克隆私有仓库
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: |
+          echo "🔐 使用 PAT 克隆私有仓库: ${{ env.PRIVATE_REPO }}"
+          git clone https://fgnb666:$GH_TOKEN@github.com/${{ env.PRIVATE_REPO }}.git private_repo
+          echo "✅ 克隆成功，目录结构:"
+          ls -la private_repo/
+
+      - name: 📋 复制脚本到工作目录
+        run: |
+          SCRIPT_PATH=$(find private_repo -name "${{ env.SCRIPT_NAME }}" -type f | head -n 1)
+          
+          if [ -z "$SCRIPT_PATH" ]; then
+            echo "❌ 未找到脚本: ${{ env.SCRIPT_NAME }}"
+            echo "📁 private_repo 目录内容:"
+            find private_repo -type f | head -20
+            exit 1
+          fi
+          
+          echo "✅ 找到脚本: $SCRIPT_PATH"
+          cp "$SCRIPT_PATH" ./
+          ls -la ./${{ env.SCRIPT_NAME }}
+
+      - name: 🌐 安装 Chrome 浏览器
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          google-chrome --version
+
+      - name: 🔄 执行 Mochi Hosting 脚本
+        env:
+          EMAIL: ${{ secrets.AIDA_EMAIL }}
+          PASSWORD: ${{ secrets.AIDA_PASSWORD }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          echo "🚀 开始执行 Mochi Hosting 脚本..."
+          chmod +x ./${{ env.SCRIPT_NAME }}
+          python ./${{ env.SCRIPT_NAME }}
+
+      - name: 🧹 清理敏感文件
+        if: always()
+        run: |
+          rm -rf private_repo
+          echo "🧹 已清理私有仓库文件"
+
+      - name: 📸 上传截图（如果失败）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mochi-hosting-screenshots
+          path: |
+            *.png
+            *.jpg
+          retention-days: 7
+
+      - name: ✅ 完成
+        if: success()
+        run: echo "✅ Mochi Hosting 流程执行完成"
+
+      - name: ❌ 失败
+        if: failure()
+        run: echo "❌ Mochi Hosting 流程执行失败，请检查日志"
