@@ -1,42 +1,67 @@
 name: Mochi Hosting
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 0,12 * * *'
+    - cron: '0 8 */3 * *'  # 每3天一次，北京时间8点
+  workflow_dispatch:
 
 jobs:
-  mochi:
-    name: Mochi Hosting
+  renew:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v4
-      
       - name: 检出私有仓库
         uses: actions/checkout@v4
         with:
           repository: fgnb666/hosting.aida0710.work-xuqi
-          path: private_repo
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-      
-      - uses: actions/setup-python@v5
+          path: ./mochi
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      
-      - name: 安装依赖
+
+      - name: 安装 Chrome 浏览器
         run: |
-          pip install seleniumbase requests
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
-      
+          google-chrome --version
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install --upgrade pip
+          pip install seleniumbase requests
+
       - name: 执行续期
         run: |
-          cp private_repo/aida_renew.py ./
-          rm -rf private_repo
+          cd ./mochi
           python aida_renew.py
         env:
           EMAIL: ${{ secrets.AIDA_EMAIL }}
           PASSWORD: ${{ secrets.AIDA_PASSWORD }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          # SeleniumBase 在 CI 环境必须用 headless
+          HEADLESS: "true"
+
+      - name: 提交更新（如果有）
+        run: |
+          cd ./mochi
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "自动续期更新 [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: 上传截图（如果失败）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mochi-screenshots
+          path: |
+            ./mochi/*.png
+            ./mochi/*.jpg
+          retention-days: 7
