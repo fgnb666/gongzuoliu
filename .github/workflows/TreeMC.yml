@@ -1,58 +1,376 @@
-name: TreeMC
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+TreeMC 自动续期工具
+"""
 
-on:
-  schedule:
-    - cron: '0 8 */2 * *'
-  workflow_dispatch:
+import json
+import os
+import sys
+import time
+import asyncio
+from datetime import datetime
+from typing import Dict, List
 
-jobs:
-  renew:
-    runs-on: ubuntu-latest
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from playwright.async_api import async_playwright
 
-    steps:
-      - name: Checkout private repo
-        uses: actions/checkout@v4
-        with:
-          repository: fgnb666/www.treemc.host-xuqi
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: ./treemc
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+# ==================== 配置 ====================
 
-      - name: Cache Playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright
-          restore-keys: |
-            ${{ runner.os }}-playwright
+class Config:
+    BASE_URL = "https://www.treemc.host"
+    LOGIN_URL = "/login?next=/dashboard"
+    DASHBOARD_URL = "/dashboard"
+    SESSION_FILE = "treemc_session.json"
+    
+    # ✅ 续期 API（从浏览器抓取）
+    RENEW_API = "/api/server/renew"
+    RENEW_METHOD = "POST"
+    
+    DISCORD_EMAIL = os.environ.get("DISCORD_EMAIL", "")
+    DISCORD_PASSWORD = os.environ.get("DISCORD_PASSWORD", "")
+    
+    # ✅ 完整请求头（从浏览器复制）
+    HEADERS = {
+        "accept": "*/*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "zh,zh-CN;q=0.9",
+        "content-length": "0",
+        "origin": "https://www.treemc.host",
+        "referer": "https://www.treemc.host/dashboard",
+        "sec-ch-ua": '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+        "priority": "u=1, i",
+    }
 
-      - name: Install dependencies
-        run: |
-          pip install playwright requests
-          playwright install chromium
-          playwright install-deps
 
-      - name: Run renew
-        run: |
-          cd ./treemc
-          python main.py
-        env:
-          DISCORD_EMAIL: ${{ secrets.DISCORD_EMAIL }}
-          DISCORD_PASSWORD: ${{ secrets.DISCORD_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+# ==================== Session 管理器 ====================
 
-      - name: Commit updated session
-        run: |
-          cd ./treemc
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
-          git add treemc_session.json
-          git diff --staged --quiet || git commit -m "update session [skip ci]"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+class SessionManager:
+    def __init__(self, filepath: str = Config.SESSION_FILE):
+        self.filepath = filepath
+        self.data: Dict = {}
+        self.cookies: List[Dict] = []
+    
+    def load(self) -> bool:
+        if not os.path.exists(self.filepath):
+            print(f"❌ Session 文件不存在: {self.filepath}")
+            return False
+        
+        try:
+            with open(self.filepath, 'r', encoding='utf-8') as f:
+                self.data = json.load(f)
+            self.cookies = self.data.get("cookies", [])
+            
+            if not self.cookies:
+                print("❌ Session 文件中没有 Cookie")
+                return False
+            
+            print(f"✅ 加载 Session 成功 (Cookie 数量: {len(self.cookies)})")
+            
+            # 打印关键 Cookie
+            for c in self.cookies:
+                name = c.get("name", "")
+                if "cf_" in name or "token" in name or "session" in name:
+                    print(f"   🔑 {name}: {c.get('value', '')[:30]}...")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 加载 Session 失败: {e}")
+            return False
+    
+    def save(self) -> bool:
+        try:
+            with open(self.filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, indent=2, ensure_ascii=False)
+            print(f"✅ Session 已保存到 {self.filepath}")
+            return True
+        except Exception as e:
+            print(f"❌ 保存 Session 失败: {e}")
+            return False
+    
+    def update_cookies(self, cookies: List[Dict]) -> None:
+        self.cookies = cookies
+        self.data["cookies"] = cookies
+        self.data["updated_at"] = datetime.now().isoformat()
+    
+    def get_cookie_dict(self) -> Dict[str, str]:
+        return {c.get("name"): c.get("value") for c in self.cookies if c.get("name")}
+
+
+# ==================== 无头 Discord 登录器 ====================
+
+class HeadlessDiscordLogin:
+    def __init__(self):
+        self.session_manager = SessionManager()
+    
+    async def _login(self) -> bool:
+        print("🚀 启动无头浏览器...")
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                    "--disable-notifications",
+                    "--window-size=1920,1080"
+                ]
+            )
+            
+            page = await browser.new_page()
+            
+            await page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                window.chrome = {runtime: {}};
+            """)
+            
+            login_url = f"{Config.BASE_URL}{Config.LOGIN_URL}"
+            print(f"🌐 访问: {login_url}")
+            await page.goto(login_url, wait_until="domcontentloaded")
+            await asyncio.sleep(2)
+            
+            print("🔍 点击 Discord 登录按钮...")
+            try:
+                btn = await page.wait_for_selector(
+                    "button:has-text('Continue with Discord'), a:has-text('Discord'), a[href*='discord.com/oauth2']",
+                    timeout=5000
+                )
+                if btn:
+                    await btn.click()
+                    print("✅ 已点击 Discord 按钮")
+            except:
+                print("⚠️ 未找到 Discord 按钮")
+                return False
+            
+            await asyncio.sleep(3)
+            
+            if "discord.com/login" in page.url:
+                print("🔐 登录 Discord...")
+                email = Config.DISCORD_EMAIL
+                password = Config.DISCORD_PASSWORD
+                
+                if not email or not password:
+                    print("❌ 未设置 DISCORD_EMAIL 或 DISCORD_PASSWORD")
+                    return False
+                
+                try:
+                    await page.fill("input[name='email']", email)
+                    await page.fill("input[name='password']", password)
+                    await page.click("button[type='submit']")
+                    print("✅ 已提交 Discord 登录")
+                    await asyncio.sleep(3)
+                except Exception as e:
+                    print(f"❌ Discord 登录失败: {e}")
+                    return False
+            
+            if "oauth2/authorize" in page.url:
+                print("📝 点击授权...")
+                try:
+                    btn = await page.wait_for_selector(
+                        "button:has-text('授权'), button:has-text('Authorize')",
+                        timeout=5000
+                    )
+                    if btn:
+                        await btn.click()
+                        print("✅ 已授权")
+                        await asyncio.sleep(3)
+                except:
+                    print("⚠️ 未找到授权按钮")
+            
+            print("⏳ 等待跳转到 Dashboard...")
+            for i in range(60):
+                await asyncio.sleep(2)
+                if "dashboard" in page.url.lower():
+                    print("✅ 已跳转到 Dashboard")
+                    break
+            
+            # ✅ 获取所有 Cookie（包括 Cloudflare）
+            cookies = await browser.cookies()
+            
+            # 保存所有 Cookie
+            target_cookies = [
+                c for c in cookies
+                if "treemc.host" in c.get("domain", "")
+            ]
+            if not target_cookies:
+                target_cookies = cookies
+            
+            print(f"📦 捕获到 {len(target_cookies)} 个 Cookie")
+            
+            # 打印关键 Cookie
+            for c in target_cookies:
+                name = c.get("name", "")
+                if "cf_" in name or "token" in name or "session" in name:
+                    print(f"   🔑 {name}: {c.get('value', '')[:30]}...")
+            
+            self.session_manager.update_cookies(target_cookies)
+            return self.session_manager.save()
+    
+    def run(self) -> bool:
+        return asyncio.run(self._login())
+
+
+# ==================== TreeMC 客户端 ====================
+
+class TreeMCClient:
+    def __init__(self):
+        self.session_manager = SessionManager()
+        self.session = requests.Session()
+        self.logged_in = False
+        
+        retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+    
+    def load_cookies(self) -> bool:
+        if not self.session_manager.load():
+            return False
+        
+        cookie_dict = self.session_manager.get_cookie_dict()
+        self.session.cookies.update(cookie_dict)
+        
+        # ✅ 使用完整请求头
+        headers = Config.HEADERS.copy()
+        self.session.headers.update(headers)
+        
+        print(f"🍪 已加载 {len(cookie_dict)} 个 Cookie")
+        return True
+    
+    def verify_login(self) -> bool:
+        print("🔍 验证登录状态...")
+        
+        try:
+            url = f"{Config.BASE_URL}{Config.DASHBOARD_URL}"
+            resp = self.session.get(url, timeout=15, allow_redirects=False)
+            
+            if resp.status_code == 200:
+                print("✅ 登录状态有效")
+                self.logged_in = True
+                return True
+            
+            if resp.status_code in [301, 302, 303, 307, 308]:
+                location = resp.headers.get("Location", "")
+                if "login" in location.lower():
+                    print("❌ 被重定向到登录页")
+                    self.logged_in = False
+                    return False
+            
+            print(f"⚠️ 未知状态: {resp.status_code}")
+            self.logged_in = False
+            return False
+            
+        except Exception as e:
+            print(f"❌ 验证失败: {e}")
+            return False
+    
+    def renew_server(self) -> bool:
+        if not self.logged_in:
+            print("❌ 未登录")
+            return False
+        
+        print("🔄 执行续期...")
+        
+        try:
+            # ✅ 续期 URL
+            url = f"{Config.BASE_URL}{Config.RENEW_API}"
+            
+            # ✅ POST 请求，body 为空
+            resp = self.session.post(url, timeout=15)
+            
+            print(f"📡 状态码: {resp.status_code}")
+            
+            if resp.status_code == 200:
+                print("✅ 续期成功！")
+                try:
+                    data = resp.json()
+                    print(f"📦 响应: {json.dumps(data, indent=2, ensure_ascii=False)}")
+                except:
+                    print(f"📦 响应: {resp.text[:200]}")
+                return True
+            else:
+                print(f"❌ 续期失败: {resp.status_code}")
+                print(f"📦 响应: {resp.text[:200]}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 续期异常: {e}")
+            return False
+    
+    def run(self) -> bool:
+        print("=" * 60)
+        print("🚀 TreeMC 自动续期")
+        print("=" * 60)
+        print(f"⏱  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 60)
+        
+        if not self.load_cookies():
+            print("🔄 尝试无头登录获取 Session...")
+            login = HeadlessDiscordLogin()
+            if not login.run():
+                print("❌ 登录失败")
+                return False
+            self.load_cookies()
+        
+        if not self.verify_login():
+            print("🔄 尝试重新登录...")
+            login = HeadlessDiscordLogin()
+            if not login.run():
+                print("❌ 重新登录失败")
+                return False
+            self.load_cookies()
+            if not self.verify_login():
+                return False
+        
+        return self.renew_server()
+
+
+# ==================== 主入口 ====================
+
+def send_telegram(message: str):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    
+    if bot_token and chat_id:
+        try:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=10)
+        except:
+            pass
+
+
+def main():
+    try:
+        client = TreeMCClient()
+        success = client.run()
+        
+        if success:
+            send_telegram("✅ TreeMC 续期成功！")
+        else:
+            send_telegram("❌ TreeMC 续期失败")
+        
+        sys.exit(0 if success else 1)
+        
+    except Exception as e:
+        error_msg = f"❌ TreeMC 异常: {str(e)}"
+        print(error_msg)
+        send_telegram(error_msg)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
