@@ -1,58 +1,70 @@
-name: TreeMC
+name: TreeMC-Renew
 
 on:
-  schedule:
-    - cron: '0 8 */2 * *'
   workflow_dispatch:
 
 jobs:
   renew:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - name: Checkout private repo
+      - name: 📥 下载私库脚本
         uses: actions/checkout@v4
         with:
           repository: fgnb666/www.treemc.host-xuqi
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: ./treemc
+          path: private
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: 📂 复制脚本到工作目录
+        run: cp private/treemc_renew.py treemc_renew.py
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Cache Playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright
-          restore-keys: |
-            ${{ runner.os }}-playwright
-
-      - name: Install dependencies
-        run: |
-          pip install playwright requests
-          playwright install chromium
-          playwright install-deps
-
-      - name: Run renew
-        run: |
-          cd ./treemc
-          python main.py
+      - name: 🛡️ 启动 GOST 代理转发
+        if: ${{ env.GOST_PROXY != '' }}
         env:
-          DISCORD_EMAIL: ${{ secrets.DISCORD_EMAIL }}
-          DISCORD_PASSWORD: ${{ secrets.DISCORD_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      - name: Commit updated session
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
         run: |
-          cd ./treemc
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
-          git add treemc_session.json
-          git diff --staged --quiet || git commit -m "update session [skip ci]"
-          git push
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          nohup ./gost -L http://:8080 -F "$GOST_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "✅ GOST 已启动，测试连通性..."
+          curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\([0-9]*\.[0-9]*\.\)[0-9]*\.[0-9]*/\1**.**/g'
+          echo ""
+
+      - name: 🐍 安装 Python 依赖
+        run: pip install requests playwright && playwright install chromium && playwright install-deps
+
+      - name: 🌲 执行续期
         env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          PYTHONIOENCODING: utf-8
+          TREEMC_ACCOUNT: ${{ secrets.TREEMC_ACCOUNT }}
+          TG_BOT: ${{ secrets.TG_BOT }}
+          CRON_JOB: ${{ secrets.CRON_JOB }}
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
+        run: python treemc_renew.py
+
+      - name: 📤 推回私库
+        if: always()
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          cd private
+          if ! git diff --quiet; then
+            git config user.email "actions@github.com"
+            git config user.name "GitHub Actions"
+            git add treemc_renew.py
+            git commit -m "🔄 自动更新 [skip ci]"
+            git push "https://${PRIVATE_REPO_TOKEN}@github.com/fgnb666/www.treemc.host-xuqi.git" HEAD
+            echo "✅ 推送成功"
+          else
+            echo "ℹ️ 无需推送"
+          fi
