@@ -2,7 +2,6 @@ name: TreeMC
 
 on:
   schedule:
-    # 每2天 UTC 时间 8:00 运行（北京时间 16:00）
     - cron: '0 8 */2 * *'
   workflow_dispatch:
 
