@@ -2,7 +2,6 @@ name: TreeMC
 
 on:
   schedule:
-    # 每2天 UTC 时间 8:00 运行（北京时间 16:00）
     - cron: '0 8 */2 * *'
   workflow_dispatch:
 
@@ -42,6 +41,8 @@ jobs:
           cd ./treemc
           python main.py
         env:
+          DISCORD_EMAIL: ${{ secrets.DISCORD_EMAIL }}
+          DISCORD_PASSWORD: ${{ secrets.DISCORD_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
