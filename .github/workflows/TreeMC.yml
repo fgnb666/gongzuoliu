@@ -1,0 +1,59 @@
+name: TreeMC
+
+on:
+  schedule:
+    # 每2天 UTC 时间 8:00 运行（北京时间 16:00）
+    - cron: '0 8 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: fgnb666/www.treemc.host-xuqi
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: ./treemc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright
+          restore-keys: |
+            ${{ runner.os }}-playwright
+
+      - name: Install dependencies
+        run: |
+          pip install playwright requests
+          playwright install chromium
+          playwright install-deps
+
+      - name: Run renew
+        run: |
+          cd ./treemc
+          python main.py
+        env:
+          DISCORD_EMAIL: ${{ secrets.DISCORD_EMAIL }}
+          DISCORD_PASSWORD: ${{ secrets.DISCORD_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit updated session
+        run: |
+          cd ./treemc
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add treemc_session.json
+          git diff --staged --quiet || git commit -m "update session [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
