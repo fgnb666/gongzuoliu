@@ -1,10 +1,7 @@
 name: TreeMC-Renew
 
 on:
-  workflow_dispatch:           # 保留手动触发
-  schedule:
-    - cron: '0 0 * * *'        # 每天 UTC 0:00（北京时间 8:00）
-    - cron: '0 12 * * *'       # 每天 UTC 12:00（北京时间 20:00）
+  workflow_dispatch:
 
 jobs:
   renew:
@@ -70,4 +67,4 @@ jobs:
             echo "✅ 推送成功"
           else
             echo "ℹ️ 无需推送"
-          fi
+          fi  这个工作流多久跑一次
