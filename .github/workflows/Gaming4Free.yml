@@ -2,7 +2,7 @@ name: Gaming4Free
 
 on:
   schedule:
-    - cron: '2 */6 * * *'
+    - cron: '0 0,6,12,18 * * *'  # 每天 0点、6点、12点、18点 执行
   workflow_dispatch:
 
 jobs:
