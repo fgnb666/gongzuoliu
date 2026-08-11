@@ -1,4 +1,4 @@
-name: FenixHost
+name: FenixHost 自动续期
 
 on:
   schedule:
@@ -11,38 +11,56 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # ========== 1. 拉取私库脚本 ==========
-      - name: Checkout private repository
+      # ============================================================
+      # 1. 拉取私库脚本
+      # ============================================================
+      - name: Checkout private repo
         uses: actions/checkout@v4
         with:
           repository: fgnb666/fenixhost.net
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: fenixhost
+          path: ./fenixhost
 
-      # ========== 2. 设置 Python ==========
+      # ============================================================
+      # 2. 查看拉取结果（调试用）
+      # ============================================================
+      - name: List files
+        run: |
+          echo "=== 拉取的文件 ==="
+          ls -la ./fenixhost/
+
+      # ============================================================
+      # 3. 设置 Python
+      # ============================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # ========== 3. 安装依赖 ==========
+      # ============================================================
+      # 4. 安装依赖
+      # ============================================================
       - name: Install dependencies
         run: |
           pip install requests 'requests[socks]'
 
-      # ========== 4. 执行续期 ==========
+      # ============================================================
+      # 5. 执行续期脚本 (main.py)
+      # ============================================================
       - name: Run renewal
-        working-directory: fenixhost
+        working-directory: ./fenixhost
         run: |
-          python fenixhost.py 2>&1 | tee renew.log
+          python main.py 2>&1 | tee renew.log
         env:
           TG_BOT: ${{ secrets.TG_BOT }}
 
-      # ========== 5. 提取下次运行时间 ==========
+      # ============================================================
+      # 6. 提取下次运行时间
+      # ============================================================
       - name: Extract next run time
         id: extract_next_run
         if: success()
-        working-directory: fenixhost
+        working-directory: ./fenixhost
         run: |
           NEXT_RUN=$(grep -oP '下次触发\(UTC\): \K\d{4}-\d{2}-\d{2} \d{2}:\d{2}' renew.log | tail -1 || true)
           
@@ -56,7 +74,9 @@ jobs:
           echo "skip_update=false" >> "$GITHUB_OUTPUT"
           echo "::notice::⏰ 下次运行时间: $NEXT_RUN UTC"
 
-      # ========== 6. 自动更新 Cron（在公开仓库） ==========
+      # ============================================================
+      # 7. 自动更新 Cron（在公开仓库）
+      # ============================================================
       - name: Update next cron schedule
         if: success() && steps.extract_next_run.outputs.skip_update != 'true'
         env:
@@ -73,13 +93,12 @@ jobs:
           
           echo "::notice::📟 新 Cron: $NEW_CRON"
           
-          # ✅ 克隆公开仓库（当前工作流所在的仓库）
           git clone "https://${{ github.actor }}:${REPO_TOKEN}@github.com/${{ github.repository }}.git" public-repo
           cd public-repo
           
           WORKFLOW_FILE=".github/workflows/fenixhost.yml"
           if [ ! -f "$WORKFLOW_FILE" ]; then
-            echo "::error::在公开仓库找不到 fenixhost.yml"
+            echo "::error::找不到 fenixhost.yml"
             exit 1
           fi
           
@@ -104,17 +123,19 @@ jobs:
           git push
           echo "::notice::✅ Cron 更新成功"
 
-      # ========== 7. 提交 Cookie 更新到私库 ==========
+      # ============================================================
+      # 8. 提交 Cookie 更新到私库
+      # ============================================================
       - name: Commit updated cookie to private repo
         if: success()
         run: |
-          cd fenixhost
+          cd ./fenixhost
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           
           git add cookies.txt
           if git diff --staged --quiet; then
-            echo "Cookie 无变化，跳过提交"
+            echo "💤 Cookie 无变化，跳过提交"
             exit 0
           fi
           
@@ -122,7 +143,9 @@ jobs:
           git push
           echo "✅ Cookie 已提交到私库"
 
-      # ========== 8. 清理运行记录 ==========
+      # ============================================================
+      # 9. 清理运行记录
+      # ============================================================
       - name: Clean workflow runs
         if: always()
         uses: Mattraks/delete-workflow-runs@v2
