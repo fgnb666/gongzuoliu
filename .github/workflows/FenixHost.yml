@@ -1,4 +1,4 @@
-name: FenixHost
+name: FenixHost 自动续期
 
 on:
   schedule:
@@ -73,13 +73,13 @@ jobs:
           
           echo "::notice::📟 新 Cron: $NEW_CRON"
           
-          # 克隆公开仓库（当前工作流所在的仓库）
+          # ✅ 克隆公开仓库（当前工作流所在的仓库）
           git clone "https://${{ github.actor }}:${REPO_TOKEN}@github.com/${{ github.repository }}.git" public-repo
           cd public-repo
           
           WORKFLOW_FILE=".github/workflows/fenixhost.yml"
           if [ ! -f "$WORKFLOW_FILE" ]; then
-            echo "::error::找不到 fenixhost.yml"
+            echo "::error::在公开仓库找不到 fenixhost.yml"
             exit 1
           fi
           
