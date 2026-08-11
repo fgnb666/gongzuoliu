@@ -1,4 +1,4 @@
-name: FenixHost 自动续期
+name: FenixHost
 
 on:
   schedule:
