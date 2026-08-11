@@ -2,7 +2,6 @@ name: FenixHost 自动续期
 
 on:
   schedule:
-    # 默认每天 UTC 16:30 运行（北京时间 00:30）
     - cron: '30 16 * * *'
   workflow_dispatch:
 
@@ -18,7 +17,7 @@ jobs:
         with:
           repository: fgnb666/fenixhost.net
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: ./fenixhost
+          path: ./fenixhost  # ✅ 拉取到 ./fenixhost
           sparse-checkout: |
             scripts/fenixhost/fenixhost.py
             scripts/fenixhost/cookies.txt
@@ -37,7 +36,7 @@ jobs:
 
       # ========== 4. 执行续期 ==========
       - name: Run renewal
-        working-directory: ./fenixhost/scripts/fenixhost
+        working-directory: ./fenixhost/scripts/fenixhost  # ✅ 注意是 ./fenixhost
         run: |
           python fenixhost.py 2>&1 | tee renew.log
         env:
@@ -70,7 +69,6 @@ jobs:
         run: |
           set -e
           
-          # 计算新的 Cron 时间
           NEXT_MINUTE=$(date -u -d "$NEXT_RUN" +"%-M")
           NEXT_HOUR=$(date -u -d "$NEXT_RUN" +"%-H")
           NEXT_DAY=$(date -u -d "$NEXT_RUN" +"%-d")
