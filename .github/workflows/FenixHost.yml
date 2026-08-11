@@ -17,11 +17,8 @@ jobs:
         with:
           repository: fgnb666/fenixhost.net
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: fenixhost  # ✅ 去掉 ./
-          sparse-checkout: |
-            scripts/fenixhost/fenixhost.py
-            scripts/fenixhost/cookies.txt
-          sparse-checkout-cone-mode: false
+          path: fenixhost
+          # 文件在根目录，不需要 sparse-checkout，或者直接拉取全部
 
       # ========== 2. 设置 Python ==========
       - name: Setup Python
@@ -36,7 +33,7 @@ jobs:
 
       # ========== 4. 执行续期 ==========
       - name: Run renewal
-        working-directory: fenixhost/scripts/fenixhost  # ✅ 去掉 ./
+        working-directory: fenixhost  # ✅ 改成根目录
         run: |
           python fenixhost.py 2>&1 | tee renew.log
         env:
@@ -46,7 +43,7 @@ jobs:
       - name: Extract next run time
         id: extract_next_run
         if: success()
-        working-directory: fenixhost/scripts/fenixhost  # ✅ 去掉 ./
+        working-directory: fenixhost  # ✅ 改成根目录
         run: |
           NEXT_RUN=$(grep -oP '下次触发\(UTC\): \K\d{4}-\d{2}-\d{2} \d{2}:\d{2}' renew.log | tail -1 || true)
           
@@ -77,7 +74,7 @@ jobs:
           
           echo "::notice::📟 新 Cron: $NEW_CRON"
           
-          cd fenixhost  # ✅ 去掉 ./
+          cd fenixhost
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           
@@ -109,11 +106,11 @@ jobs:
       - name: Commit updated cookie
         if: success()
         run: |
-          cd fenixhost  # ✅ 去掉 ./
+          cd fenixhost
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           
-          git add scripts/fenixhost/cookies.txt
+          git add cookies.txt  # ✅ 改成根目录
           if git diff --staged --quiet; then
             echo "Cookie 无变化，跳过提交"
             exit 0
