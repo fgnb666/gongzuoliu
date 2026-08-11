@@ -17,7 +17,7 @@ jobs:
         with:
           repository: fgnb666/fenixhost.net
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: ./fenixhost  # ✅ 拉取到 ./fenixhost
+          path: fenixhost  # ✅ 去掉 ./
           sparse-checkout: |
             scripts/fenixhost/fenixhost.py
             scripts/fenixhost/cookies.txt
@@ -36,7 +36,7 @@ jobs:
 
       # ========== 4. 执行续期 ==========
       - name: Run renewal
-        working-directory: ./fenixhost/scripts/fenixhost  # ✅ 注意是 ./fenixhost
+        working-directory: fenixhost/scripts/fenixhost  # ✅ 去掉 ./
         run: |
           python fenixhost.py 2>&1 | tee renew.log
         env:
@@ -46,7 +46,7 @@ jobs:
       - name: Extract next run time
         id: extract_next_run
         if: success()
-        working-directory: ./fenixhost/scripts/fenixhost
+        working-directory: fenixhost/scripts/fenixhost  # ✅ 去掉 ./
         run: |
           NEXT_RUN=$(grep -oP '下次触发\(UTC\): \K\d{4}-\d{2}-\d{2} \d{2}:\d{2}' renew.log | tail -1 || true)
           
@@ -77,7 +77,7 @@ jobs:
           
           echo "::notice::📟 新 Cron: $NEW_CRON"
           
-          cd ./fenixhost
+          cd fenixhost  # ✅ 去掉 ./
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           
@@ -109,7 +109,7 @@ jobs:
       - name: Commit updated cookie
         if: success()
         run: |
-          cd ./fenixhost
+          cd fenixhost  # ✅ 去掉 ./
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           
