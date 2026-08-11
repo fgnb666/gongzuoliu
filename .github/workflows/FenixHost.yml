@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ===== 第一步：检出你的私库 =====
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
@@ -19,35 +18,19 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: ./fenixhost
 
-      # ===== 第二步：设置 Python 环境 =====
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # ===== 第三步：安装依赖 =====
       - name: Install dependencies
         run: |
           cd ./fenixhost
           pip install requests
 
-      # ===== 第四步：运行续期脚本（main.py） =====
       - name: Run renew script
         run: |
           cd ./fenixhost
           python main.py
         env:
-          # 从 GitHub Secrets 读取敏感信息
           REMEMBER_WEB_VALUE: ${{ secrets.REMEMBER_WEB_VALUE }}
-
-      # ===== 第五步：提交更新的 Cookie 文件 =====
-      - name: Commit updated session
-        run: |
-          cd ./fenixhost
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
-          git add cookies.json
-          git diff --staged --quiet || git commit -m "chore: auto renew session [skip ci]"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
