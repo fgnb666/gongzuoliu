@@ -2,7 +2,7 @@ name: FenixHost Auto Renew
 
 on:
   schedule:
-    - cron: '0 8 */2 * *'
+    - cron: '0 8 */6 * *'
   workflow_dispatch:
 
 jobs:
