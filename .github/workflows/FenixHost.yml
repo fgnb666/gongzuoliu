@@ -1,4 +1,4 @@
-name: FenixHost Auto Renew
+name: FenixHost
 
 on:
   schedule:
