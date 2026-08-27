@@ -1,5 +1,4 @@
-name: HostShip Renew
-
+name: HostShip
 on:
   schedule:
     - cron: '0 8 */6 * *'
