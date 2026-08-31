@@ -57,7 +57,7 @@ jobs:
           ZAMPTO_PASSWORD: ${{ secrets.ZAMPTO_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          IS_PROXY: ${{ secrets.SOCKS_PROXY_URL != '' && 'true' || 'false' }}
+          IS_PROXY: "true"
           PROXY_SERVER: "http://127.0.0.1:1080"
           HEADLESS: "false"
           GITHUB_RUN_ID: ${{ github.run_id }}
