@@ -51,6 +51,7 @@ jobs:
       - name: Run renew script with proxy
         working-directory: ./skycastle
         env:
+          # 关键修复：如果 SOCKS5_URL 有值，强制 IS_PROXY 为 true
           IS_PROXY: ${{ secrets.SOCKS5_URL != '' && 'true' || 'false' }}
           PROXY_SERVER: "http://127.0.0.1:1080"
           HEADLESS: "false"
@@ -59,6 +60,8 @@ jobs:
         run: |
           echo "🌐 IS_PROXY: $IS_PROXY"
           echo "🌐 PROXY_SERVER: $PROXY_SERVER"
+          # 检查 gost 是否在运行
+          ps aux | grep gost || echo "⚠️ gost not running"
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python main.py
 
       - name: Upload logs if failed
@@ -66,5 +69,7 @@ jobs:
         if: failure()
         with:
           name: logs-${{ github.run_number }}
-          path: /tmp/gost.log
+          path: |
+            /tmp/gost.log
+            ./skycastle/screenshots/
           retention-days: 7
