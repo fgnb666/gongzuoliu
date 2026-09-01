@@ -2,7 +2,6 @@ name: SkyCastle Auto Renew
 
 on:
   schedule:
-    # 每6天一次，北京时间 16:00（UTC 8:00）
     - cron: '0 8 */6 * *'
   workflow_dispatch:
 
@@ -23,30 +22,18 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Cache Playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-v1
-          restore-keys: |
-            ${{ runner.os }}-playwright-v1
-
       - name: Install dependencies
         run: |
           cd ./skycastle
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install chromium
-          playwright install-deps
 
       - name: Run renew script
         run: |
           cd ./skycastle
           python main.py
         env:
-          # 从 GitHub Secrets 读取敏感信息
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           COOKIE_LARAVEL_SESSION: ${{ secrets.COOKIE_LARAVEL_SESSION }}
           COOKIE_REMEMBER_TOKEN: ${{ secrets.COOKIE_REMEMBER_TOKEN }}
-          # 如果有其他 cookie 也加在这里
