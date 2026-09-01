@@ -22,18 +22,49 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         working-directory: ./skycastle
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb x11-utils
+          sudo apt-get install -y xvfb x11-utils wget
           pip install -r requirements.txt
           seleniumbase install chromedriver
 
-      - name: Run renew script
+      - name: Install gost (SOCKS5 → HTTP proxy converter)
+        run: |
+          wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
+          gunzip gost-linux-amd64-2.11.5.gz
+          chmod +x gost-linux-amd64-2.11.5
+          sudo mv gost-linux-amd64-2.11.5 /usr/local/bin/gost
+
+      - name: Start gost proxy
+        env:
+          SOCKS5_URL: ${{ secrets.SOCKS5_URL }}
+        if: ${{ env.SOCKS5_URL != '' }}
+        run: |
+          nohup gost -L=:1080 -F="$SOCKS5_URL" > /tmp/gost.log 2>&1 &
+          sleep 5
+          echo "✅ SOCKS5 proxy started on 127.0.0.1:1080"
+          ps aux | grep gost || echo "Warning: gost may not be running"
+          netstat -tlnp | grep 1080 || echo "Port 1080 not found"
+
+      - name: Run renew script with proxy
         working-directory: ./skycastle
         env:
-          IS_PROXY: "false"
+          IS_PROXY: ${{ secrets.SOCKS5_URL != '' && 'true' || 'false' }}
+          PROXY_SERVER: "http://127.0.0.1:1080"
           HEADLESS: "false"
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          echo "🌐 IS_PROXY: $IS_PROXY"
+          echo "🌐 PROXY_SERVER: $PROXY_SERVER"
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python main.py
+
+      - name: Upload logs if failed
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: logs-${{ github.run_number }}
+          path: /tmp/gost.log
+          retention-days: 7
