@@ -22,12 +22,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install system dependencies
+      - name: Install Chrome
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y google-chrome-stable
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           cd ./skycastle
           python -m pip install --upgrade pip
@@ -37,3 +37,5 @@ jobs:
         run: |
           cd ./skycastle
           python main.py
+        env:
+          TWOCAPTCHA_API_KEY: ${{ secrets.TWOCAPTCHA_API_KEY }}
