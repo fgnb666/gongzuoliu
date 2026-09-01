@@ -22,11 +22,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-
       - name: Install dependencies
         run: |
           cd ./skycastle
@@ -38,4 +33,4 @@ jobs:
           cd ./skycastle
           python main.py
         env:
-          TWOCAPTCHA_API_KEY: ${{ secrets.TWOCAPTCHA_API_KEY }}
+          CHUANYUN_API_KEY: ${{ secrets.CHUANYUN_API_KEY }}
