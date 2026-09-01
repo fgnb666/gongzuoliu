@@ -22,7 +22,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: Install Python dependencies
         run: |
           cd ./skycastle
           python -m pip install --upgrade pip
@@ -32,8 +37,3 @@ jobs:
         run: |
           cd ./skycastle
           python main.py
-        env:
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          COOKIE_LARAVEL_SESSION: ${{ secrets.COOKIE_LARAVEL_SESSION }}
-          COOKIE_REMEMBER_TOKEN: ${{ secrets.COOKIE_REMEMBER_TOKEN }}
