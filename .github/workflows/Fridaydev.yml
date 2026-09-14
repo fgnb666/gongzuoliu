@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install system dependencies
-        working-directory: scripts/Fridaydev
+        working-directory: scripts
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
@@ -51,10 +51,8 @@ jobs:
           netstat -tlnp | grep 1080 || echo "Port 1080 not found"
 
       - name: Run renew script
-        working-directory: scripts/Fridaydev
+        working-directory: scripts
         env:
-          FRIDAYDEV_EMAIL: ${{ secrets.FRIDAYDEV_EMAIL }}
-          FRIDAYDEV_PASSWORD: ${{ secrets.FRIDAYDEV_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           IS_PROXY: ${{ secrets.SOCKS_PROXY_URL != '' && 'true' || 'false' }}
@@ -69,7 +67,7 @@ jobs:
         if: always()
         with:
           name: screenshots-${{ github.run_number }}
-          path: scripts/Fridaydev/screenshots/
+          path: scripts/screenshots/
           retention-days: 7
           if-no-files-found: warn
 
@@ -78,6 +76,6 @@ jobs:
         if: always()
         with:
           name: response-${{ github.run_number }}
-          path: scripts/Fridaydev/response.json
+          path: scripts/response.json
           retention-days: 7
           if-no-files-found: warn
