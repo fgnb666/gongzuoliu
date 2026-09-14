@@ -1,4 +1,4 @@
-name: Fridaydev Auto Renew
+name: Fridaydev
 
 on:
   schedule:
