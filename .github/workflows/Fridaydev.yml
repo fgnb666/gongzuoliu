@@ -1,4 +1,4 @@
-name: Fridaydev
+name: Fridaydev Auto Renew
 
 on:
   schedule:
@@ -44,18 +44,17 @@ jobs:
           SOCKS_PROXY_URL: ${{ secrets.SOCKS_PROXY_URL }}
         if: ${{ env.SOCKS_PROXY_URL != '' }}
         run: |
-          # 启动 gost 作为后台进程，将节点转换为本地 HTTP 代理
           nohup gost -L=:1080 -F="$SOCKS_PROXY_URL" > /tmp/gost.log 2>&1 &
           sleep 5
           echo "Gost proxy started on 127.0.0.1:1080"
-          # 验证 gost 是否运行
           ps aux | grep gost || echo "Warning: gost may not be running"
           netstat -tlnp | grep 1080 || echo "Port 1080 not found"
 
       - name: Run renew script
         working-directory: scripts/Fridaydev
         env:
-          DISCORD_TOKEN_1: ${{ secrets.DISCORD_TOKEN_1 }}
+          FRIDAYDEV_EMAIL: ${{ secrets.FRIDAYDEV_EMAIL }}
+          FRIDAYDEV_PASSWORD: ${{ secrets.FRIDAYDEV_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           IS_PROXY: ${{ secrets.SOCKS_PROXY_URL != '' && 'true' || 'false' }}
