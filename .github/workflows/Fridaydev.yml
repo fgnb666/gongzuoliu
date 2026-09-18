@@ -62,12 +62,3 @@ jobs:
           path: scripts/screenshots/
           retention-days: 7
           if-no-files-found: warn
-
-      - name: Upload response
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: response.json
-          path: scripts/response.json
-          retention-days: 7
-          if-no-files-found: warn
