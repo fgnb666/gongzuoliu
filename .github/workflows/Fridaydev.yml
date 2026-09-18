@@ -2,7 +2,6 @@ name: Fridaydev Auto Renew
 
 on:
   schedule:
-    # 北京时间每天 12:00 = UTC 04:00
     - cron: '0 4 * * *'
   workflow_dispatch:
 
@@ -28,9 +27,8 @@ jobs:
         working-directory: scripts
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb chromium-browser chromium-chromedriver
           pip install -r requirements.txt
-          playwright install --with-deps chromium
 
       - name: Install gost (proxy converter)
         run: |
@@ -47,18 +45,12 @@ jobs:
           nohup gost -L=:1080 -F="$SOCKS_PROXY_URL" > /tmp/gost.log 2>&1 &
           sleep 5
           echo "Gost proxy started on 127.0.0.1:1080"
-          ps aux | grep gost || echo "Warning: gost may not be running"
-          netstat -tlnp | grep 1080 || echo "Port 1080 not found"
 
       - name: Run renew script
         working-directory: scripts
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           IS_PROXY: ${{ secrets.SOCKS_PROXY_URL != '' && 'true' || 'false' }}
           PROXY_SERVER: "http://127.0.0.1:1080"
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python main.py
 
@@ -75,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: response-${{ github.run_number }}
+          name: response.json
           path: scripts/response.json
           retention-days: 7
           if-no-files-found: warn
